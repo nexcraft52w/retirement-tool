@@ -238,15 +238,21 @@ export default function RetirementDocumentToolMVP() {
           <div className="min-h-screen bg-slate-50 text-slate-900 p-6 md:p-10">
       <div className="max-w-6xl mx-auto space-y-8">
         <section className="bg-white rounded-3xl shadow-sm p-8 border border-slate-200 no-print">
-          <div className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm mb-4">
-            MVPたたき台
-          </div>
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-            文書作成・送付支援ツール
+            退職願・退職届を簡単に作成
           </h1>
-          <p className="text-base md:text-lg text-slate-600 max-w-3xl leading-7">
-            まずは最小構成で作る。先に「入力できる」「確認できる」「印刷できる」状態を作る。
-          </p>
+        <p className="text-base md:text-lg text-slate-600 leading-7">
+          入力するだけで、退職願・退職届をすぐに作成できます。
+          印刷やPDF保存にも対応しています。
+        </p>
+        <div className="mt-6">
+          <span className="inline-block text-sm text-slate-500">
+            ↓ 下のフォームから入力を開始できます
+          </span>
+          <div className="mt-2 text-xs text-slate-400">
+              ※入力内容はこの画面内のみで処理されます。
+          </div>
+        </div>
         </section>
 
         <section className="bg-white rounded-3xl shadow-sm p-8 border border-slate-200 no-print">
@@ -532,20 +538,25 @@ export default function RetirementDocumentToolMVP() {
         </section>
 
         <section className="print-section bg-white rounded-3xl shadow-sm p-8 border border-slate-200">
-          <div className="flex items-center justify-between mb-6 no-print">
-            <h2 className="text-2xl font-bold">{titleText}プレビュー</h2>
-            <button
-              onClick={handlePrint}
-              disabled={hasError}
-              className={`px-6 py-3 rounded-xl text-white ${
-                hasError
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-slate-900 hover:bg-slate-800"
-              }`}
-            >
-              印刷する（PDF保存可）
-            </button>
-          </div>
+            <div className="mb-6 no-print">
+              <h2 className="text-2xl font-bold mb-4">{titleText}プレビュー</h2>
+
+                <button
+                  onClick={handlePrint}
+                  disabled={hasError}
+                  className={`w-full py-4 rounded-xl text-lg font-semibold shadow ${
+                  hasError
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-green-600 text-white hover:bg-green-700"
+                  }`}
+                >
+                  PDFを出力する
+                </button>
+
+    <div className="mt-2 text-xs text-slate-400 text-right">
+      ※印刷画面から印刷またはPDF保存を選択できます
+    </div>
+  </div>
 
           <div className="overflow-x-auto">
             <div
