@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type DocumentType = "wish" | "notice";
@@ -241,6 +242,12 @@ export default function RetirementDocumentToolMVP() {
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
             退職願・退職届を簡単に作成
           </h1>
+        <p className="text-lg font-semibold text-blue-700 mb-2">
+             退職は「意思表示」で成立します。
+        </p>
+        <p className="text-base text-slate-700 mb-4">
+          まずは書面で意思を伝えましょう。
+        </p>
         <p className="text-base md:text-lg text-slate-600 leading-7">
           入力するだけで、退職願・退職届をすぐに作成できます。
           印刷やPDF保存にも対応しています。
@@ -350,17 +357,7 @@ export default function RetirementDocumentToolMVP() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  住所（郵送用）
-                </label>
-                <textarea
-                  name="address"
-                  value={form.address}
-                  onChange={handleChange}
-                  placeholder="例：東京都〇〇区〇〇"
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-300"
-                />
+               
               </div>
 
               <div>
@@ -402,17 +399,7 @@ export default function RetirementDocumentToolMVP() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">
-                  会社住所（郵送用）
-                </label>
-                <textarea
-                  name="companyAddress"
-                  value={form.companyAddress}
-                  onChange={handleChange}
-                  placeholder="例：東京都〇〇区〇〇"
-                  rows={3}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:ring-2 focus:ring-slate-300"
-                />
+                
               </div>
 
               <div>
@@ -477,14 +464,6 @@ export default function RetirementDocumentToolMVP() {
                 <div className="text-sm text-slate-500">氏名</div>
                 <div className="font-medium">{form.name || "未入力"}</div>
               </div>
-
-              <div>
-                <div className="text-sm text-slate-500">住所（郵送用）</div>
-                <div className="font-medium whitespace-pre-line">
-                  {form.address || "未入力"}
-                </div>
-              </div>
-
               <div>
                 <div className="text-sm text-slate-500">所属部署名</div>
                 <div className="font-medium">{form.department || "未入力"}</div>
@@ -494,14 +473,6 @@ export default function RetirementDocumentToolMVP() {
                 <div className="text-sm text-slate-500">会社名</div>
                 <div className="font-medium">{form.companyName || "未入力"}</div>
               </div>
-
-              <div>
-                <div className="text-sm text-slate-500">会社住所（郵送用）</div>
-                <div className="font-medium whitespace-pre-line">
-                  {form.companyAddress || "未入力"}
-                </div>
-              </div>
-
               <div>
                 <div className="text-sm text-slate-500">代表取締役氏名</div>
                 <div className="font-medium">
@@ -528,37 +499,20 @@ export default function RetirementDocumentToolMVP() {
                 {hasError
                   ? "未入力項目があります。すべて入力するまで印刷・PDF保存はできません。"
                   : "出力可能な状態です。"}
-              </div>
-
-              <div className="rounded-2xl p-4 bg-slate-100 text-slate-700">
-                住所は紙面には出さず、郵送時の情報として保持します。入力内容はブラウザに自動保存されます。
-              </div>
+              </div>            
             </div>
           </div>
         </section>
 
         <section className="print-section bg-white rounded-3xl shadow-sm p-8 border border-slate-200">
-            <div className="mb-6 no-print">
-              <h2 className="text-2xl font-bold mb-4">{titleText}プレビュー</h2>
+          <div className="mb-6 no-print">
+            <h2 className="text-2xl font-bold mb-2">{titleText}プレビュー</h2>
+            <p className="text-sm text-slate-600">
+              内容を確認したうえで、PDFを出力してください。
+            </p>
+          </div>
 
-                <button
-                  onClick={handlePrint}
-                  disabled={hasError}
-                  className={`w-full py-4 rounded-xl text-lg font-semibold shadow ${
-                  hasError
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-green-600 text-white hover:bg-green-700"
-                  }`}
-                >
-                  PDFを出力する
-                </button>
-
-    <div className="mt-2 text-xs text-slate-400 text-right">
-      ※印刷画面から印刷またはPDF保存を選択できます
-    </div>
-  </div>
-
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto mb-8">
             <div
               ref={printRef}
               className="mx-auto bg-white border border-slate-300 relative retirement-sheet"
@@ -641,6 +595,99 @@ export default function RetirementDocumentToolMVP() {
               </div>
             </div>
           </div>
+
+
+
+          <div className="mb-8 no-print">
+            <button
+              onClick={handlePrint}
+              disabled={hasError}
+              className={`w-full py-4 rounded-2xl text-lg font-semibold shadow ${
+                hasError
+                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  : "bg-green-600 text-white hover:bg-green-700"
+              }`}
+            >
+              PDFを出力する
+            </button>
+
+            <div className="mt-2 text-xs text-slate-400 text-right">
+              ※印刷画面から印刷またはPDF保存を選択できます
+            </div>
+            <div className="mt-1 text-xs text-slate-400 text-right">
+              ※PDF出力・自分で提出する場合は無料です
+            </div>
+          </div>
+            <div className="no-print border-t border-slate-200 pt-6">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+              <h3 className="mb-3 text-lg font-bold text-slate-900">
+                次の手続き
+              </h3>
+
+                {/* 郵送ブロック */}
+                  <div className="mt-8 bg-white rounded-3xl shadow-sm p-8 border border-slate-200 no-print">
+                    <h2 className="text-2xl font-bold mb-3">会社とのやり取りを最小限にしたい方へ</h2>
+
+                    <p className="text-slate-600 leading-7 mb-6">
+                      直接のやり取りが難しい場合でも、郵送で提出することができます。
+                    </p>
+
+                  {/* 料金表示 */}
+                    <div className="mb-6 rounded-xl border border-blue-300 bg-blue-50 p-5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                            <div className="text-sm font-semibold text-slate-800">
+                              郵送セット
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              宛名書き・送り状・私物送付・書類送付先の指定が自動生成できます。
+                            </div>
+                        </div>
+
+                      <div className="text-xl font-bold text-blue-700">
+                            1,000円
+                      </div>
+
+                    </div>
+
+                    <div className="mt-3 text-xs text-slate-500">
+                      ※このサービスは郵送手続きを補助するものです
+                    </div>
+                  </div> 
+
+                <Link
+                  href="/postal"
+                    className={`block w-full rounded-2xl py-4 text-center text-lg font-semibold shadow ${
+                      hasError
+                        ? "bg-gray-300 text-gray-500 pointer-events-none"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                  >
+                    このまま郵送準備をする
+                </Link>
+            </div>
+          </div>
+        </div>
+
+          <div className="no-print pt-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5">
+              <h3 className="mb-2 text-base font-bold text-slate-900">
+                退職後の確認
+              </h3>
+              <p className="mb-4 text-sm leading-7 text-slate-700">
+                会社へ返却する書類や持ち物、回収しておきたい資料の確認はこちらから進めます。
+              </p>
+
+              <Link
+                href="/after-resignation"
+                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                退職後のチェックページへ進む
+              </Link>
+            </div>
+          </div>
+
+
         </section>
       </div>
     </div>
