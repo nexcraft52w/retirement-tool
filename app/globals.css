@@ -19,8 +19,240 @@
   }
 }
 
+html,
 body {
+  margin: 0;
+  padding: 0;
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* =========================
+   共通
+========================= */
+.print-root {
+  background: #f3f4f6;
+  padding: 24px;
+}
+
+.print-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+}
+
+.page-break {
+  display: block;
+  height: 0;
+}
+
+/* =========================
+   1ページ目：送り状
+========================= */
+.sheet-page {
+  position: relative;
+  width: 210mm;
+  height: 297mm;
+  margin: 0 auto;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px #d1d5db;
+  color: #111;
+}
+
+.sheet-inner {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 18mm 16mm 18mm 16mm;
+}
+
+.sheet-recipient-block {
+  text-align: left;
+  font-size: 12pt;
+  line-height: 1.8;
+  margin-bottom: 18mm;
+}
+
+.sheet-recipient-company {
+  font-size: 15pt;
+  font-weight: 700;
+}
+
+.sheet-recipient-department,
+.sheet-recipient-name {
+  font-size: 12pt;
+}
+
+.sheet-date-block {
+  text-align: right;
+  font-size: 11pt;
+  line-height: 1.8;
+  margin-bottom: 16mm;
+}
+
+.sheet-subject {
+  text-align: center;
+  font-size: 18pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 14mm;
+}
+
+.sheet-body {
+  font-size: 11pt;
+  line-height: 2;
+  white-space: pre-wrap;
+}
+
+.sheet-body p {
+  margin: 0 0 4mm 0;
+}
+
+.sheet-sign {
+  margin-top: 14mm;
+  text-align: right;
+  font-size: 11pt;
+  line-height: 1.8;
+}
+
+/* =========================
+   2ページ目：レターパック
+========================= */
+.letter-page {
+  position: relative;
+  width: 210mm;
+  height: 297mm;
+  margin: 0 auto;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px #d1d5db;
+}
+
+.letter-pack-sheet {
+  position: absolute;
+  top: 138mm;
+  left: 14mm;
+  width: 182mm;
+  height: auto;
+  display: block;
+}
+
+.letter-pack-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #111;
+}
+
+/* 宛先郵便番号 */
+.letter-pack-zipcode {
+  position: absolute;
+  top: 201mm;
+  left: 112mm;
+  display: flex;
+  gap: 1.8mm;
+}
+
+.letter-pack-zipcode span {
+  width: 7mm;
+  text-align: center;
+  font-size: 15pt;
+  line-height: 1;
+}
+
+/* 宛先住所 */
+.letter-pack-to-address {
+  position: absolute;
+  top: 221mm;
+  left: 118mm;
+  width: 48mm;
+  font-size: 9pt;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 宛先名 */
+.letter-pack-to-name {
+  position: absolute;
+  top: 247mm;
+  left: 118mm;
+  width: 42mm;
+  font-size: 14pt;
+  line-height: 1.2;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 差出人住所 */
+.letter-pack-from-address {
+  position: absolute;
+  top: 272mm;
+  left: 118mm;
+  width: 48mm;
+  font-size: 8.5pt;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 差出人名 */
+.letter-pack-from-name {
+  position: absolute;
+  top: 289mm;
+  left: 118mm;
+  width: 42mm;
+  font-size: 10.5pt;
+  line-height: 1.2;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* =========================
+   印刷
+========================= */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: #fff !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-root {
+    padding: 0;
+    background: #fff;
+  }
+
+  .print-stack {
+    gap: 0;
+  }
+
+  .sheet-page,
+  .letter-page {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    box-shadow: none;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .page-break {
+    break-before: page;
+    page-break-before: always;
+  }
 }
