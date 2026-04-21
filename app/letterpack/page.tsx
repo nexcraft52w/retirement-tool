@@ -400,7 +400,8 @@ export default function LetterpackPage() {
         const pdfBytes = await buildLetterpackPdf(form);
         if (cancelled) return;
 
-        const blob = new Blob([pdfBytes], { type: "application/pdf" });
+        const safePdfBytes = Uint8Array.from(pdfBytes);
+        const blob = new Blob([safePdfBytes], { type: "application/pdf" });
         const url = URL.createObjectURL(blob);
 
         if (previewUrlRef.current) {
@@ -524,7 +525,8 @@ export default function LetterpackPage() {
       setError("");
 
       const pdfBytes = await buildLetterpackPdf(form);
-      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const safePdfBytes = Uint8Array.from(pdfBytes);
+      const blob = new Blob([safePdfBytes], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
 
       const a = document.createElement("a");

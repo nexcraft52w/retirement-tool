@@ -797,7 +797,8 @@ export default function WebMailPage() {
 
       const pdfBytes = await pdfDoc.save();
       const filename = `送り状_${sanitizeFilePart(preview.companyName)}.pdf`;
-      downloadBlob(new Blob([pdfBytes], { type: "application/pdf" }), filename);
+      const safePdfBytes = Uint8Array.from(pdfBytes);
+            downloadBlob(new Blob([safePdfBytes], { type: "application/pdf" }), filename);
     } finally {
       setIsGeneratingCover(false);
     }

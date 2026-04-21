@@ -121,8 +121,7 @@ ${stressRelief || "未入力"}
       },
     });
 
-    console.log("response.output_text:", response.output_text);
-
+    
     const content = response.output_text;
 
     if (!content) {
