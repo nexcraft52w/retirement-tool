@@ -71,7 +71,7 @@ const toKanjiYear = (year: number) => {
 };
 
 export default function RetirementDocumentToolMVP() {
-  const [documentType, setDocumentType] = useState<DocumentType>("wish");
+  const [documentType, setDocumentType] = useState<DocumentType>("notice");
 
   const [form, setForm] = useState<FormState>({
     name: "",
@@ -128,7 +128,7 @@ export default function RetirementDocumentToolMVP() {
           ? stored.documentType
           : postal?.documentType === "wish" || postal?.documentType === "notice"
           ? postal.documentType
-          : "wish";
+          : "notice";
 
       const nextForm: FormState = {
         name: "",
@@ -241,23 +241,23 @@ export default function RetirementDocumentToolMVP() {
   const titleText = documentType === "wish" ? "退職願" : "退職届";
 
   const handlePrint = async () => {
-  if (!printRef.current) return;
+    if (!printRef.current) return;
 
-  const printWindow = window.open("", "_blank", "width=900,height=1200");
-  if (!printWindow) {
-    alert("印刷用ウィンドウを開けませんでした。ポップアップブロックを確認してください。");
-    return;
-  }
+    const printWindow = window.open("", "_blank", "width=900,height=1200");
+    if (!printWindow) {
+      alert("印刷用ウィンドウを開けませんでした。ポップアップブロックを確認してください。");
+      return;
+    }
 
-  fetch("/api/count", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ type: "pdf" }),
-  }).catch(() => {
-    // 計測失敗でも出力は続行
-  });
+    fetch("/api/count", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ type: "pdf" }),
+    }).catch(() => {
+      // 計測失敗でも出力は続行
+    });
 
     const html = printRef.current.outerHTML;
 
@@ -441,7 +441,7 @@ export default function RetirementDocumentToolMVP() {
     sessionStorage.removeItem(WEB_MAIL_FORM_STORAGE_KEY);
     localStorage.removeItem(RETIREMENT_FORM_STORAGE_KEY);
 
-    setDocumentType("wish");
+    setDocumentType("notice");
     setForm({
       name: "",
       address: "",
@@ -644,25 +644,6 @@ export default function RetirementDocumentToolMVP() {
           <div className="grid gap-4 md:grid-cols-2">
             <button
               type="button"
-              onClick={() => setDocumentType("wish")}
-              className={`rounded-2xl border p-5 text-left transition ${
-                documentType === "wish"
-                  ? "border-slate-900 bg-slate-900 text-white"
-                  : "border-slate-300 bg-white text-slate-900"
-              }`}
-            >
-              <div className="mb-2 text-xl font-semibold">退職願</div>
-              <div
-                className={`leading-7 ${
-                  documentType === "wish" ? "text-slate-200" : "text-slate-600"
-                }`}
-              >
-                会社に対して退職を願い出る文書。社内調整前や相談段階で使われることがあります。
-              </div>
-            </button>
-
-            <button
-              type="button"
               onClick={() => setDocumentType("notice")}
               className={`rounded-2xl border p-5 text-left transition ${
                 documentType === "notice"
@@ -679,9 +660,32 @@ export default function RetirementDocumentToolMVP() {
                 退職の意思を正式に届け出る文書。最終提出書類として扱われることがあります。
               </div>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setDocumentType("wish")}
+              className={`rounded-2xl border p-5 text-left transition ${
+                documentType === "wish"
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-300 bg-white text-slate-900"
+              }`}
+            >
+              <div className="mb-2 text-xl font-semibold">退職願</div>
+              <div
+                className={`leading-7 ${
+                  documentType === "wish" ? "text-slate-200" : "text-slate-600"
+                }`}
+              >
+                会社に対して退職を願い出る文書。社内調整前や相談段階で使われることがあります。
+              </div>
+            </button>
           </div>
 
-          <div className="mt-5 rounded-2xl bg-slate-100 p-4 leading-7 text-slate-700">
+          <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-7 text-blue-800">
+            ※郵送で提出する場合は「退職届」での提出が一般的です。
+          </div>
+
+          <div className="mt-4 rounded-2xl bg-slate-100 p-4 leading-7 text-slate-700">
             {explanationText}
           </div>
         </section>
@@ -1017,10 +1021,14 @@ export default function RetirementDocumentToolMVP() {
                       </div>
                     </div>
 
-                    <div className="shrink-0 text-xl font-bold text-blue-700">
-                      1,500円
+                    <div className="shrink-0 text-right">
+                      <div className="text-sm text-slate-500 line-through">
+                        1,500円
+                      </div>
+                      <div className="text-xl font-bold text-blue-700">
+                        5/9まで無料
+                      </div>
                     </div>
-                     <div className="text-xl font-bold text-blue-700">5/9まで無料</div>
                   </div>
 
                   <div className="mt-3 text-xs text-slate-500">
@@ -1049,8 +1057,8 @@ export default function RetirementDocumentToolMVP() {
 
                 <p className="mb-4 leading-7 text-slate-700">
                   退職時のエピソードを投稿して郵送補助をする場合、無料期間終了後は
-                 <span className="font-semibold text-orange-700"> 300円〜500円割引 </span>
-                 です。
+                  <span className="font-semibold text-orange-700"> 300円〜500円割引 </span>
+                  です。
                 </p>
 
                 <div className="mb-4 rounded-xl border border-orange-300 bg-white p-4">
@@ -1091,21 +1099,39 @@ export default function RetirementDocumentToolMVP() {
             </div>
           </div>
 
-          <div className="no-print grid gap-4 pt-6 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <h3 className="mb-2 text-base font-bold text-slate-900">
-                退職後の確認
-              </h3>
-              <p className="mb-4 text-sm leading-7 text-slate-700">
-                会社へ返却する書類や持ち物、回収しておきたい資料の確認はこちらから進めます。
-              </p>
+          <div className="no-print space-y-4 pt-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                <h3 className="mb-2 text-base font-bold text-slate-900">
+                  退職時の注意事項
+                </h3>
+                <p className="mb-4 text-sm leading-7 text-slate-700">
+                  退職意思の伝え方、上司への相談、郵送時の注意点などを確認できます。
+                </p>
 
-              <Link
-                href="/next-step"
-                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
-              >
-                退職後のチェックページへ進む
-              </Link>
+                <Link
+                  href="/next-step"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+                >
+                  注意事項を確認する
+                </Link>
+              </div>
+
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-5">
+                <h3 className="mb-2 text-base font-bold text-slate-900">
+                  退職後の生活費シミュレーション
+                </h3>
+                <p className="mb-4 text-sm leading-7 text-slate-700">
+                  退職後の手元資金が何ヶ月持つか、家賃・生活費・収入見込みから概算できます。
+                </p>
+
+                <Link
+                  href="/life-plan"
+                  className="inline-flex items-center justify-center rounded-xl border border-blue-300 bg-white px-5 py-3 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                >
+                  生活費をシミュレーションする
+                </Link>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -1124,12 +1150,13 @@ export default function RetirementDocumentToolMVP() {
               </div>
             </div>
           </div>
+
           <div className="no-print mt-6 grid gap-3 sm:grid-cols-2">
             <a
               href="/feedback"
-              className="rounded-xl border border-gray-300 bg-white px-4 py-3 text-center font-medium text-gray-800 hover:bg-slate-50"
+              className="rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-center font-medium text-blue-700 hover:bg-blue-100"
             >
-              改善要望を送る
+              ご利用の感想を送る
             </a>
 
             <a

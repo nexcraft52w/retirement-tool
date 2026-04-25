@@ -619,7 +619,7 @@ export default function SuccessPage() {
           disabled={!!error}
           className="mt-4 w-full rounded-xl border border-slate-300 bg-white px-6 py-4 text-base font-bold text-slate-700 disabled:bg-gray-100 disabled:text-slate-400"
         >
-          レターパック宛名を作成する
+          送り状ダウンロード後、次へ進む
         </button>
 
           <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-700">
