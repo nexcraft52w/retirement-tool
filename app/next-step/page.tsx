@@ -112,46 +112,47 @@ export default function RetirementChecklistPage() {
 
         {/* 4 */}
         <Section title="4．住民税">
-          <li>
-          住民税（前年の収入に対して発生）
-            <ul className="list-disc pl-5">
-            <li>自分で払う or 最後の給与で一括</li>
-            <li>一括 → 最後の給与が減る</li>
-            <li>自分で払う → 滞納注意（差押えリスク）</li>
+          <ul className="list-disc pl-5">
+            <li>
+              住民税（前年の収入に対して発生）
+
+              <ul className="list-disc pl-5 mt-1">
+                <li>自分で払う or 最後の給与で一括</li>
+                <li>一括 → 最後の給与が減る</li>
+                <li>自分で払う → 滞納注意（差押えリスク）</li>
+              </ul>
+
+              <details className="mt-2">
+                <summary className="cursor-pointer text-sm text-blue-600">
+                  補足を見る
+                </summary>
+
+              <div className="mt-2 text-sm text-gray-600 space-y-2">
+                <p>
+                  住民税は前年の収入をもとに計算され、6月から翌年5月まで支払います。
+                </p>
+
+                <p>
+                  会社在籍中は給与から天引き（特別徴収）ですが、
+                  退職後は自分で支払うか、最後の給与で一括精算となります。
+                </p>
+
+                <p>1月〜5月の退職は一括徴収が基本です。</p>
+
+                <p>
+                  自分で支払う場合、後日納付書が届きます。
+                  放置すると延滞や差押えにつながる可能性があります。
+                </p>
+
+                <p>
+                  入社直後の方は、まだ天引きが始まっていない場合もあるため、
+                  給与明細の「住民税」欄を確認してください。
+                </p>
+                </div>
+              </details>
+              </li>
             </ul>
-
-            <details className="mt-2">
-            <summary className="cursor-pointer text-sm text-blue-600">
-                補足を見る
-            </summary>
-
-            <div className="mt-2 text-sm text-gray-600 space-y-2">
-            <p>
-                住民税は前年の収入をもとに計算され、6月から翌年5月まで支払います。
-            </p>
-
-            <p>
-                会社在籍中は給与から天引き（特別徴収）ですが、
-                退職後は自分で支払うか、最後の給与で一括精算となります。
-            </p>
-
-            <p>
-                1月〜5月の退職は一括徴収が基本です。
-            </p>
-
-            <p>
-                自分で支払う場合、後日納付書が届きます。
-                放置すると延滞や差押えにつながる可能性があります。
-            </p>
-
-            <p>
-                入社直後の方は、まだ天引きが始まっていない場合もあるため、
-                給与明細の「住民税」欄を確認してください。
-            </p>
-            </div>
-        </details>
-        </li>
-        </Section>
+          </Section>
 
         {/* 5 */}
         <Section title="5．退職後①（役所）">

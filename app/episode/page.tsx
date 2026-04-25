@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-const BASE_PRICE = 1500;
-const EPISODE_DISCOUNT = 300;
+const EPISODE_BASE_PRICE = 1500;
+const EPISODE_POST_DISCOUNT = 300;
 const AI_POLISH_DISCOUNT = 200;
 
 const RETIREMENT_DRAFT_KEY = "retirement-document-draft-v1";
@@ -141,6 +141,14 @@ type EpisodeDraft = {
   isSubmitted: boolean;
 };
 
+type EpisodePricingResult = {
+  basePrice: number;
+  episodeDiscount: number;
+  aiPolishDiscount: number;
+  totalDiscount: number;
+  finalPrice: number;
+};
+
 function normalizeText(text: string) {
   return text
     .replace(/\r\n/g, "\n")
@@ -214,6 +222,24 @@ function judgePost(
   return {
     ok: reasons.length === 0,
     reasons,
+  };
+}
+
+function resolveEpisodePricing(params: {
+  episodeDiscountApplied: boolean;
+  aiPolishDiscountApplied: boolean;
+}): EpisodePricingResult {
+  const episodeDiscount = params.episodeDiscountApplied ? EPISODE_POST_DISCOUNT : 0;
+  const aiPolishDiscount = params.aiPolishDiscountApplied ? AI_POLISH_DISCOUNT : 0;
+  const totalDiscount = episodeDiscount + aiPolishDiscount;
+  const finalPrice = Math.max(EPISODE_BASE_PRICE - totalDiscount, 0);
+
+  return {
+    basePrice: EPISODE_BASE_PRICE,
+    episodeDiscount,
+    aiPolishDiscount,
+    totalDiscount,
+    finalPrice,
   };
 }
 
@@ -421,14 +447,13 @@ export default function EpisodePage() {
     isSubmitted,
   ]);
 
-  const totalDiscount = useMemo(() => {
-    let total = 0;
-    if (episodeDiscountApplied) total += EPISODE_DISCOUNT;
-    if (aiPolishDiscountApplied) total += AI_POLISH_DISCOUNT;
-    return total;
+  const pricing = useMemo(() => {
+    return resolveEpisodePricing({
+      episodeDiscountApplied,
+      aiPolishDiscountApplied,
+    });
   }, [episodeDiscountApplied, aiPolishDiscountApplied]);
 
-  const currentPrice = BASE_PRICE - totalDiscount;
   const subjectCount = subject.trim().length;
   const bodyCount = normalizeText(body).length;
   const canTryAiPolish =
@@ -520,11 +545,11 @@ export default function EpisodePage() {
   const buildHandoffPayload = (): HandoffPayload => {
     return {
       discount: {
-        basePrice: BASE_PRICE,
+        basePrice: pricing.basePrice,
         episodeDiscountApplied,
         aiPolishDiscountApplied,
-        totalDiscount,
-        finalPrice: currentPrice,
+        totalDiscount: pricing.totalDiscount,
+        finalPrice: pricing.finalPrice,
       },
       episode: {
         penName,
@@ -558,6 +583,13 @@ export default function EpisodePage() {
         return;
       }
 
+      const nextEpisodeDiscountApplied = true;
+      const nextAiPolishDiscountApplied = aiPolishAdopted;
+      const nextPricing = resolveEpisodePricing({
+        episodeDiscountApplied: nextEpisodeDiscountApplied,
+        aiPolishDiscountApplied: nextAiPolishDiscountApplied,
+      });
+
       const response = await fetch("/api/episode-submit", {
         method: "POST",
         headers: {
@@ -573,7 +605,7 @@ export default function EpisodePage() {
           aiPolishedStressRelief: aiPolishAdopted ? aiPolishedStressRelief : "",
           companyName,
           discountType: aiPolishAdopted ? "post_and_polish" : "post",
-          discountAmount: aiPolishAdopted ? 500 : 300,
+          discountAmount: nextPricing.totalDiscount,
         }),
       });
 
@@ -584,17 +616,14 @@ export default function EpisodePage() {
         return;
       }
 
-      const nextEpisodeDiscountApplied = true;
-      const nextAiPolishDiscountApplied = aiPolishAdopted;
-
       setEpisodeDiscountApplied(nextEpisodeDiscountApplied);
       setAiPolishDiscountApplied(nextAiPolishDiscountApplied);
       setIsSubmitted(true);
 
       setSubmitMessage(
         nextAiPolishDiscountApplied
-          ? "自動審査に通過しました。合計500円引きが適用されました。必要であればこのまま郵送補助へ進めます。"
-          : "自動審査に通過しました。300円引きが適用されました。必要であればこのまま郵送補助へ進めます。"
+          ? `自動審査に通過しました。合計${nextPricing.totalDiscount}円引きが適用されました。必要であればこのまま郵送補助へ進めます。`
+          : `自動審査に通過しました。${nextPricing.totalDiscount}円引きが適用されました。必要であればこのまま郵送補助へ進めます。`
       );
     } catch (error) {
       console.error("episode submit error:", error);
@@ -902,26 +931,26 @@ export default function EpisodePage() {
 
               <div className="mt-3 flex items-end gap-3">
                 <div className="text-lg text-slate-400 line-through">
-                  {BASE_PRICE.toLocaleString()}円
+                  {pricing.basePrice.toLocaleString()}円
                 </div>
                 <div className="text-3xl font-bold text-slate-900">
-                  {currentPrice.toLocaleString()}円
+                  {pricing.finalPrice.toLocaleString()}円
                 </div>
               </div>
 
               <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm leading-6">
                 <div className={episodeDiscountApplied ? "text-slate-800" : "text-slate-400"}>
-                  郵送補助 割引：-300円
+                  郵送補助 割引：-{EPISODE_POST_DISCOUNT}円
                   {!episodeDiscountApplied && "（未適用）"}
                 </div>
 
                 <div className={aiPolishDiscountApplied ? "text-slate-800" : "text-slate-400"}>
-                  AI整形 割引：-200円
+                  AI整形 割引：-{AI_POLISH_DISCOUNT}円
                   {aiPolishDiscountApplied ? "（適用中）" : "（未適用）"}
                 </div>
 
                 <div className="border-t pt-2 font-semibold text-slate-900">
-                  現在の郵送補助料金：{currentPrice.toLocaleString()}円
+                  現在の郵送補助料金：{pricing.finalPrice.toLocaleString()}円
                 </div>
               </div>
 

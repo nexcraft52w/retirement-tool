@@ -16,8 +16,42 @@ type FormState = {
 };
 
 const DRAFT_KEY = "retirement-document-draft-v1";
+const RETIREMENT_FORM_STORAGE_KEY = "retirement-document-form-v1";
 const POSTAL_HANDOFF_KEY = "postal-discount-handoff-v1";
+const WEB_MAIL_FORM_STORAGE_KEY = "web-mail-form-v1";
 const COUNT_KEY = "retirement-counted-v1";
+
+const POSTAL_BASE_PRICE = 1500;
+const FREE_CAMPAIGN = true;
+
+type PostalPricingState = {
+  basePrice: number;
+  discountAmount: number;
+  finalPrice: number;
+};
+
+type WebMailSavedState = {
+  version?: number;
+  form?: {
+    senderZip?: string;
+    senderAddress1?: string;
+    senderAddress2?: string;
+    recipientName?: string;
+    department?: string;
+    itemName?: string;
+    pensionDocType?: string;
+    residentTaxMode?: string;
+    returnItemsMode?: string;
+    returnItemsNote?: string;
+  };
+  companyName?: string;
+  companyAddress?: string;
+  senderName?: string;
+  basePrice?: number;
+  discountAmount?: number;
+  finalPrice?: number;
+  updatedAt?: string;
+};
 
 const KANJI_DIGITS = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
 
@@ -48,29 +82,100 @@ export default function RetirementDocumentToolMVP() {
     representativeName: "",
     retirementDate: "",
   });
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    const saved = sessionStorage.getItem(DRAFT_KEY);
-    if (!saved) return;
-
     try {
-      const parsed = JSON.parse(saved) as {
-        documentType?: DocumentType;
-        form?: Partial<FormState>;
+      const draftRaw = sessionStorage.getItem(DRAFT_KEY);
+      const storedRaw = localStorage.getItem(RETIREMENT_FORM_STORAGE_KEY);
+      const postalRaw = sessionStorage.getItem(POSTAL_HANDOFF_KEY);
+      const webMailRaw = sessionStorage.getItem(WEB_MAIL_FORM_STORAGE_KEY);
+
+      const draft = draftRaw
+        ? (JSON.parse(draftRaw) as {
+            documentType?: DocumentType;
+            form?: Partial<FormState>;
+          })
+        : null;
+
+      const stored = storedRaw
+        ? (JSON.parse(storedRaw) as Partial<FormState> & {
+            documentType?: DocumentType;
+          })
+        : null;
+
+      const postal = postalRaw
+        ? (JSON.parse(postalRaw) as Partial<{
+            documentType: DocumentType;
+            senderName: string;
+            senderAddress: string;
+            senderDepartment: string;
+            companyName: string;
+            companyAddress: string;
+            representativeName: string;
+            retirementDate: string;
+          }>)
+        : null;
+
+      const webMail = webMailRaw
+        ? (JSON.parse(webMailRaw) as WebMailSavedState)
+        : null;
+
+      const nextDocumentType =
+        draft?.documentType === "wish" || draft?.documentType === "notice"
+          ? draft.documentType
+          : stored?.documentType === "wish" || stored?.documentType === "notice"
+          ? stored.documentType
+          : postal?.documentType === "wish" || postal?.documentType === "notice"
+          ? postal.documentType
+          : "wish";
+
+      const nextForm: FormState = {
+        name: "",
+        address: "",
+        department: "",
+        companyName: "",
+        companyAddress: "",
+        representativeName: "",
+        retirementDate: "",
+        ...stored,
+        ...(draft?.form ?? {}),
       };
 
-      if (parsed.documentType === "wish" || parsed.documentType === "notice") {
-        setDocumentType(parsed.documentType);
+      if (postal) {
+        nextForm.name = nextForm.name || postal.senderName || "";
+        nextForm.address = nextForm.address || postal.senderAddress || "";
+        nextForm.department = nextForm.department || postal.senderDepartment || "";
+        nextForm.companyName = nextForm.companyName || postal.companyName || "";
+        nextForm.companyAddress =
+          nextForm.companyAddress || postal.companyAddress || "";
+        nextForm.representativeName =
+          nextForm.representativeName || postal.representativeName || "";
+        nextForm.retirementDate =
+          nextForm.retirementDate || postal.retirementDate || "";
       }
 
-      if (parsed.form) {
-        setForm((prev) => ({
-          ...prev,
-          ...parsed.form,
-        }));
+      if (webMail) {
+        nextForm.name = nextForm.name || webMail.senderName || "";
+        nextForm.companyName = nextForm.companyName || webMail.companyName || "";
+        nextForm.companyAddress =
+          nextForm.companyAddress || webMail.companyAddress || "";
+        nextForm.address =
+          nextForm.address ||
+          [webMail.form?.senderAddress1, webMail.form?.senderAddress2]
+            .filter(Boolean)
+            .join(" ");
+        nextForm.department = nextForm.department || webMail.form?.department || "";
+        nextForm.representativeName =
+          nextForm.representativeName || webMail.form?.recipientName || "";
       }
+
+      setDocumentType(nextDocumentType);
+      setForm(nextForm);
     } catch {
       // 壊れたデータは無視
+    } finally {
+      setIsHydrated(true);
     }
   }, []);
 
@@ -92,14 +197,23 @@ export default function RetirementDocumentToolMVP() {
   }, []);
 
   useEffect(() => {
-    sessionStorage.setItem(
-      DRAFT_KEY,
+    if (!isHydrated) return;
+
+    const draftPayload = {
+      documentType,
+      form,
+    };
+
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draftPayload));
+    localStorage.setItem(
+      RETIREMENT_FORM_STORAGE_KEY,
       JSON.stringify({
+        ...form,
         documentType,
-        form,
+        updatedAt: new Date().toISOString(),
       })
     );
-  }, [documentType, form]);
+  }, [documentType, form, isHydrated]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -324,6 +438,8 @@ export default function RetirementDocumentToolMVP() {
   const resetSavedData = () => {
     sessionStorage.removeItem(DRAFT_KEY);
     sessionStorage.removeItem(POSTAL_HANDOFF_KEY);
+    sessionStorage.removeItem(WEB_MAIL_FORM_STORAGE_KEY);
+    localStorage.removeItem(RETIREMENT_FORM_STORAGE_KEY);
 
     setDocumentType("wish");
     setForm({
@@ -337,7 +453,109 @@ export default function RetirementDocumentToolMVP() {
     });
   };
 
+  const resolvePostalPricing = (): PostalPricingState => {
+    try {
+      const raw = sessionStorage.getItem(POSTAL_HANDOFF_KEY);
+      const webMailRaw = sessionStorage.getItem(WEB_MAIL_FORM_STORAGE_KEY);
+      const saved = raw ? JSON.parse(raw) : null;
+      const savedWebMail = webMailRaw ? (JSON.parse(webMailRaw) as WebMailSavedState) : null;
+
+      const basePrice =
+        typeof saved?.basePrice === "number"
+          ? saved.basePrice
+          : typeof savedWebMail?.basePrice === "number"
+          ? savedWebMail.basePrice
+          : POSTAL_BASE_PRICE;
+
+      const finalPrice =
+        typeof saved?.finalPrice === "number"
+          ? saved.finalPrice
+          : typeof saved?.discountedPriceMin === "number"
+          ? saved.discountedPriceMin
+          : typeof saved?.discountedPriceMax === "number"
+          ? saved.discountedPriceMax
+          : typeof savedWebMail?.finalPrice === "number"
+          ? savedWebMail.finalPrice
+          : FREE_CAMPAIGN
+          ? 0
+          : basePrice;
+
+      const discountAmount =
+        typeof saved?.discountAmount === "number"
+          ? saved.discountAmount
+          : typeof savedWebMail?.discountAmount === "number"
+          ? savedWebMail.discountAmount
+          : Math.max(0, basePrice - finalPrice);
+
+      return {
+        basePrice,
+        discountAmount,
+        finalPrice,
+      };
+    } catch {
+      return {
+        basePrice: POSTAL_BASE_PRICE,
+        discountAmount: FREE_CAMPAIGN ? POSTAL_BASE_PRICE : 0,
+        finalPrice: FREE_CAMPAIGN ? 0 : POSTAL_BASE_PRICE,
+      };
+    }
+  };
+
+  const saveCurrentRetirementData = () => {
+    const now = new Date().toISOString();
+
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        documentType,
+        form,
+      })
+    );
+
+    localStorage.setItem(
+      RETIREMENT_FORM_STORAGE_KEY,
+      JSON.stringify({
+        ...form,
+        documentType,
+        updatedAt: now,
+      })
+    );
+
+    try {
+      const webMailRaw = sessionStorage.getItem(WEB_MAIL_FORM_STORAGE_KEY);
+      if (!webMailRaw) return;
+
+      const savedWebMail = JSON.parse(webMailRaw) as WebMailSavedState;
+      const savedForm = savedWebMail.form ?? {};
+
+      const nextWebMail: WebMailSavedState = {
+        ...savedWebMail,
+        version: savedWebMail.version ?? 2,
+        companyName: form.companyName || savedWebMail.companyName || "",
+        companyAddress: form.companyAddress || savedWebMail.companyAddress || "",
+        senderName: form.name || savedWebMail.senderName || "",
+        form: {
+          ...savedForm,
+          department: form.department || savedForm.department || "",
+          senderAddress1: form.address || savedForm.senderAddress1 || "",
+          recipientName:
+            form.representativeName || savedForm.recipientName || "",
+        },
+        updatedAt: now,
+      };
+
+      sessionStorage.setItem(
+        WEB_MAIL_FORM_STORAGE_KEY,
+        JSON.stringify(nextWebMail)
+      );
+    } catch {
+      // web-mail側の保存が壊れていても、退職届側の保存は継続
+    }
+  };
+
   const buildHandoffData = () => {
+    const pricing = resolvePostalPricing();
+
     return {
       sourcePage: "/",
       returnPath: "/",
@@ -350,18 +568,22 @@ export default function RetirementDocumentToolMVP() {
       companyAddress: form.companyAddress,
       representativeName: form.representativeName,
       retirementDate: form.retirementDate,
-      basePrice: 0,
-      discountMin: 0,
-      discountMax: 0,
-      discountedPriceMin: 0,
-      discountedPriceMax: 0,
-      episodePosted: false,
+      basePrice: pricing.basePrice,
+      discountAmount: pricing.discountAmount,
+      finalPrice: pricing.finalPrice,
+      discountMin: pricing.discountAmount,
+      discountMax: pricing.discountAmount,
+      discountedPriceMin: pricing.finalPrice,
+      discountedPriceMax: pricing.finalPrice,
+      episodePosted: pricing.discountAmount > 0 && !FREE_CAMPAIGN,
       canGoBack: true,
       updatedAt: new Date().toISOString(),
     };
   };
 
   const handleEpisodePost = () => {
+    saveCurrentRetirementData();
+
     sessionStorage.setItem(
       POSTAL_HANDOFF_KEY,
       JSON.stringify(buildHandoffData())
@@ -370,6 +592,8 @@ export default function RetirementDocumentToolMVP() {
   };
 
   const handlePostalSupport = () => {
+    saveCurrentRetirementData();
+
     fetch("/api/count", {
       method: "POST",
       headers: {
@@ -384,7 +608,7 @@ export default function RetirementDocumentToolMVP() {
       POSTAL_HANDOFF_KEY,
       JSON.stringify(buildHandoffData())
     );
-    window.location.href = "/postal";
+    window.location.href = "/web-mail";
   };
 
   return (
@@ -877,7 +1101,7 @@ export default function RetirementDocumentToolMVP() {
               </p>
 
               <Link
-                href="/after-resignation"
+                href="/next-step"
                 className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
               >
                 退職後のチェックページへ進む

@@ -218,6 +218,9 @@ export default function LifePlanPage() {
           <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
             今ある貯金と毎月の支出・収入から、生活資金がどのくらい持つかを簡易で確認できます。
           </p>
+          <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
+            状況が変わったタイミングで、再計算することをおすすめします。
+          </p>
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
@@ -427,19 +430,25 @@ export default function LifePlanPage() {
 
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                 <a
-                  href="#"
+                  href="https://jp.indeed.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={`inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition ${ctaConfig.primary}`}
                 >
                   {ctaConfig.mainLabel}
                 </a>
                 <a
-                  href="#"
+                  href="https://timee.co.jp/"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={`inline-flex items-center justify-center rounded-xl border px-5 py-3 text-sm font-semibold transition ${ctaConfig.secondary}`}
                 >
                   {ctaConfig.sub1Label}
                 </a>
                 <a
-                  href="#"
+                  href="https://crowdworks.jp/"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className={`inline-flex items-center justify-center rounded-xl border px-5 py-3 text-sm font-semibold transition ${ctaConfig.secondary}`}
                 >
                   {ctaConfig.sub2Label}
@@ -447,9 +456,11 @@ export default function LifePlanPage() {
               </div>
 
               <p className={`mt-3 text-xs ${ctaConfig.note}`}>
-                ※ ここにアフィリエイトリンクを設置する想定です。
+                ※一部機能は現在開発中のため、内容が変更される場合があります。
               </p>
             </div>
+
+
 
             <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
               <h2 className="text-lg font-bold">残高の推移</h2>
@@ -493,6 +504,32 @@ export default function LifePlanPage() {
                 ※ 表示は最大12か月分です。
               </p>
             </div>
+
+                          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-900">
+                  家賃を抑える選択肢もあります
+                </h2>
+
+                <p className="mt-3 text-sm text-slate-600 leading-6">
+                  資金が減る前に、寮付き・住み込みの仕事も候補として確認しておくと安心です。
+                </p>
+
+              <div className="mt-5">
+                <a
+                  href="https://www.sumikominavi.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition"
+                >
+                住み込み求人ナビを見る
+                </a>
+              </div>
+
+              <p className="mt-3 text-xs text-slate-500">
+                ※住み込み・寮付き求人の外部サイトへ移動します
+              </p>
+              </div>
+
           </section>
         </div>
       </div>

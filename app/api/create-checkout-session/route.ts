@@ -1,25 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
+import { getPostalPlan, getPostalPrice } from "@/lib/postalPricing";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
 
-    const isFreeMode = process.env.NEXT_PUBLIC_POSTAL_FREE_MODE === "true";
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-    const price = Number(process.env.POSTAL_SUPPORT_PRICE || 2980);
+    const isFreeMode =
+      process.env.NEXT_PUBLIC_POSTAL_FREE_MODE === "true";
+    const siteUrl =
+      process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
-    // 無料期間中はStripeを通さず success に進める
+    const plan = getPostalPlan(body?.plan);
+    const priceDecision = getPostalPrice(plan, isFreeMode);
+
     if (isFreeMode) {
-      const successUrl = new URL("/checkout/success", siteUrl);
-      successUrl.searchParams.set("free", "1");
-      successUrl.searchParams.set("service", "postal-support");
-      successUrl.searchParams.set("amount", "0");
+      const readyUrl = new URL("/postal-ready", siteUrl);
+      readyUrl.searchParams.set("free", "1");
+      readyUrl.searchParams.set("plan", priceDecision.plan);
 
       return NextResponse.json({
         ok: true,
         mode: "free",
-        checkoutUrl: successUrl.toString(),
+        checkoutUrl: readyUrl.toString(),
       });
     }
 
@@ -38,20 +41,23 @@ export async function POST(req: NextRequest) {
           price_data: {
             currency: "jpy",
             product_data: {
-              name: "郵送補助",
+              name: `郵送補助（${priceDecision.label}）`,
               description: "送り状PDFダウンロード・レターパック宛名作成",
             },
-            unit_amount: price,
+            unit_amount: priceDecision.amount,
           },
           quantity: 1,
         },
       ],
       metadata: {
         service: "postal-support",
-        sourcePage: body?.sourcePage || "/web-mail",
+        sourcePage: body?.sourcePage || "/checkout",
+        plan: priceDecision.plan,
+        planLabel: priceDecision.label,
+        amount: String(priceDecision.amount),
       },
-      success_url: `${siteUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/checkout?canceled=1`,
+      success_url: `${siteUrl}/postal-ready?paid=1&plan=${priceDecision.plan}`,
+      cancel_url: `${siteUrl}/checkout?canceled=1&plan=${priceDecision.plan}`,
     });
 
     if (!session.url) {

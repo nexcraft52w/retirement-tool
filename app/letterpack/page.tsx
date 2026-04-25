@@ -116,8 +116,8 @@ function zipToDigits(value: string) {
 
 function withSama(value: string) {
   const trimmed = (value || "").trim();
-  if (!trimmed) return "ご担当者様";
-  return trimmed.replace(/様+$/, "") + " 様";
+  if (!trimmed) return "ご担当者";
+  return trimmed.replace(/様/g, "");
 }
 
 function joinLines(...values: string[]) {
@@ -550,7 +550,7 @@ export default function LetterpackPage() {
   };
 
   const handleSkip = () => {
-    window.history.back();
+    window.location.href = "/life-plan";
   };
 
   if (!loaded) {
@@ -595,6 +595,9 @@ export default function LetterpackPage() {
                   value={form.recipientName}
                   onChange={(e) => updateField("recipientName", e.target.value)}
                 />
+                <p className="mt-1 text-xs text-slate-500">
+                  レターパック本体に「様」が印字されているため、PDFには様を付けずに出力します。
+                </p>
               </div>
 
               <div>
@@ -680,27 +683,11 @@ export default function LetterpackPage() {
               </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => window.history.back()}
-                className="rounded-lg border px-4 py-2"
-              >
-                戻る
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSkip}
-                className="rounded-lg border px-4 py-2"
-              >
-                自分で宛名を書く（スキップ）
-              </button>
-
+            <div className="mt-6 grid gap-3">
               <button
                 type="button"
                 onClick={handleReset}
-                className="rounded-lg border px-4 py-2"
+                className="w-full rounded-lg border px-4 py-2"
               >
                 引き継ぎ内容で再読込
               </button>
@@ -709,9 +696,17 @@ export default function LetterpackPage() {
                 type="button"
                 onClick={handleDownloadPdf}
                 disabled={isBuildingPdf}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:bg-blue-300"
+                className="w-full rounded-lg bg-blue-600 px-4 py-2 text-white disabled:bg-blue-300"
               >
                 {isBuildingPdf ? "PDFを作成中..." : "PDFを保存する"}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleSkip}
+                className="w-full rounded-lg border px-4 py-2 text-slate-700"
+              >
+                出力後、自分で出す場合
               </button>
             </div>
           </section>
