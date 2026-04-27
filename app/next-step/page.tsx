@@ -113,6 +113,7 @@ export default function RetirementChecklistPage() {
         {/* 4 */}
         <Section title="4．住民税">
           <ul className="list-disc pl-5">
+            <h2 id="resident-tax">4.住民税</h2>                       
             <li>
               住民税（前年の収入に対して発生）
 

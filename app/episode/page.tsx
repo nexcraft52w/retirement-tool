@@ -708,6 +708,13 @@ export default function EpisodePage() {
         <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="space-y-6">
+              <div className="rounded-2xl bg-slate-100 p-4 text-xs leading-6 text-slate-600">
+                <div className="font-semibold text-slate-800">投稿前の確認</div>
+                <div className="mt-1">
+                  ※件名は{MIN_SUBJECT}文字以上・本文は{MIN_BODY}文字以上。暴言、個人情報、URLは投稿できません。
+                </div>
+              </div>
+
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-800">
                   ペンネーム
@@ -840,6 +847,32 @@ export default function EpisodePage() {
                 )}
               </div>
 
+              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <h2 className="text-lg font-bold text-slate-900">整形後プレビュー</h2>
+
+                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
+                  <div className="mb-2 font-semibold text-slate-900">件名</div>
+                  {subjectPreview || "整形後の件名がここに表示されます。"}
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
+                  <div className="mb-2 font-semibold text-slate-900">本文</div>
+                  {normalizedPreview || "整形後の本文がここに表示されます。"}
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
+                  <div className="mb-2 font-semibold text-slate-900">
+                    ストレス発散方法（任意）
+                  </div>
+                  {normalizedStressPreview || "整形後のストレス発散方法がここに表示されます。"}
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-amber-900 whitespace-pre-line">
+                  <div className="mb-2 font-semibold">匿名化チェック</div>
+                  {anonymousCheckNote || "匿名化や表現調整の結果がここに表示されます。"}
+                </div>
+              </section>
+
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
                   type="button"
@@ -960,51 +993,9 @@ export default function EpisodePage() {
               </div>
             </section>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">自動審査ルール</h2>
-              <div className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
-                <p>・件名は4文字以上</p>
-                <p>・本文は150文字以上</p>
-                <p>・暴言、個人情報、URLは不可</p>
-              </div>
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">整形後プレビュー</h2>
-
-              <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
-                <div className="mb-2 font-semibold text-slate-900">件名</div>
-                {subjectPreview || "整形後の件名がここに表示されます。"}
-              </div>
-
-              <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
-                <div className="mb-2 font-semibold text-slate-900">本文</div>
-                {normalizedPreview || "整形後の本文がここに表示されます。"}
-              </div>
-
-              <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
-                <div className="mb-2 font-semibold text-slate-900">
-                  ストレス発散方法（任意）
-                </div>
-                {normalizedStressPreview || "整形後のストレス発散方法がここに表示されます。"}
-              </div>
-
-              <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-amber-900 whitespace-pre-line">
-                <div className="mb-2 font-semibold">匿名化チェック</div>
-                {anonymousCheckNote || "匿名化や表現調整の結果がここに表示されます。"}
-              </div>
-            </section>
-
             <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
               <p className="text-sm leading-6 text-amber-800">
                 このページでは割引を一時表示しています。投稿完了後に進む場合のみ、次ページへ情報を引き継ぎます。
-              </p>
-            </section>
-
-            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-lg font-bold text-slate-900">引き継ぎ会社名</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                {companyName || "未取得"}
               </p>
             </section>
 

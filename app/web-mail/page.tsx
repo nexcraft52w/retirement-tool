@@ -191,7 +191,7 @@ const CHECKOUT_HANDOFF_KEY = "checkout-handoff-v1";
 const WEB_MAIL_BASE_PRICE = 1500;
 
 const FREE_CAMPAIGN = true;
-const FREE_CAMPAIGN_LABEL = "2026/5/9まで無料";
+const FREE_CAMPAIGN_LABEL = "今だけ無料公開中";
 
 const emptyForm: WebMailForm = {
   department: "",
@@ -360,6 +360,7 @@ export default function WebMailPage() {
   const [finalPrice, setFinalPrice] = useState(WEB_MAIL_BASE_PRICE);
   const [zipcodeError, setZipcodeError] = useState("");
   const [isRestored, setIsRestored] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const sendCount = async (type: "view" | "postal") => {
     try {
@@ -469,7 +470,6 @@ export default function WebMailPage() {
           nextDiscountAmount = savedWebMail.discountAmount ?? nextDiscountAmount;
           nextFinalPrice = savedWebMail.finalPrice ?? nextFinalPrice;
         } else {
-          // 旧形式互換：formだけを保存していた時代のデータ
           nextForm = {
             ...nextForm,
             ...(savedWebMail as Partial<WebMailForm>),
@@ -513,10 +513,6 @@ export default function WebMailPage() {
     : Math.max(0, discountAmount);
 
   const saveWebMailState = (targetForm: WebMailForm = form) => {
-    /**
-     * setForm直後の古いformを保存しないため、必ず引数のtargetFormを保存する。
-     * checkoutはこの web-mail-form-v1 を原本として読む。
-     */
     const normalizedForm: WebMailForm = {
       ...emptyForm,
       ...targetForm,
@@ -680,7 +676,8 @@ export default function WebMailPage() {
 
       const mergedRetirementForm = {
         ...current,
-        name: preview.senderName === "未入力" ? current.name ?? "" : preview.senderName,
+        name:
+          preview.senderName === "未入力" ? current.name ?? "" : preview.senderName,
         address: joinAddress(preview.senderAddress1, preview.senderAddress2),
         companyName:
           preview.companyName === "未入力"
@@ -1114,17 +1111,15 @@ export default function WebMailPage() {
                   </label>
                 </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                window.open("/next-step", "_blank", "noopener,noreferrer");
-                }}
-                className="mt-3 w-full rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 hover:bg-blue-100"
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.open("/next-step#resident-tax", "_blank", "noopener,noreferrer");
+                  }}
+                  className="mt-3 w-full rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 hover:bg-blue-100"
                 >
-                ご不明な方は、リンク先の4.住民税をご参照ください。
-              </button>
-
-
+                  ご不明な方は、リンク先の4.住民税をご参照ください。
+                </button>
               </div>
             </div>
           </section>
@@ -1132,17 +1127,43 @@ export default function WebMailPage() {
           <div className="space-y-6">
             <section className="rounded-3xl border bg-white p-0">
               <div className="px-6 pt-6">
-                <div className="mb-6 rounded-2xl border-2 border-red-400 bg-red-50 p-6 text-center text-xl font-bold text-red-700 leading-8">
-                  この画面で最終確認してから決済してください。（訂正できません）<br />
+                <div className="mb-6 rounded-2xl border-2 border-red-400 bg-red-50 p-6 text-center text-xl font-bold leading-8 text-red-700">
+                  この画面で最終確認してから決済してください。（訂正できません）
+                  <br />
                   決済後はすぐにPDFをダウンロードしてください（再発行できません）。
                 </div>
               </div>
 
-              <LetterSheetPreview
-                preview={preview}
-                bodySections={bodySections}
-                showSample={true}
-              />
+              <div className="px-3 pb-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="text-xs text-slate-500">
+                    全体像を縮小表示しています。
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsPreviewOpen(true)}
+                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white"
+                  >
+                    拡大して確認
+                  </button>
+                </div>
+
+                <div className="w-full overflow-hidden rounded-xl border bg-white">
+                  <div
+                    className="mx-auto w-fit origin-top"
+                    style={{
+                      zoom: 0.40                      
+                    }}
+                  >
+                    <LetterSheetPreview
+                      preview={preview}
+                      bodySections={bodySections}
+                      showSample={true}
+                    />
+                  </div>
+                </div>
+              </div>
             </section>
 
             <div className="grid gap-3">
@@ -1172,14 +1193,14 @@ export default function WebMailPage() {
                   type="button"
                   disabled={!canGenerate}
                   onClick={() => {
-                  sendCount("postal");
-                  saveHandoffData();
+                    sendCount("postal");
+                    saveHandoffData();
 
-                  sessionStorage.setItem("web-mail-paid", "true");
-                  window.location.href = "/success?paid=1";
+                    sessionStorage.setItem("web-mail-paid", "true");
+                    window.location.href = "/success?paid=1";
                   }}
                   className="mt-4 w-full rounded-xl bg-blue-600 py-3 text-white disabled:bg-gray-300"
-                  >
+                >
                   次の決済画面へ進む（今は無料）
                 </button>
               </div>
@@ -1198,6 +1219,33 @@ export default function WebMailPage() {
           </div>
         </div>
       </div>
+
+      {isPreviewOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 p-3">
+          <div className="mx-auto flex h-full max-w-[900px] flex-col rounded-2xl bg-white">
+            <div className="flex items-center justify-between border-b p-3">
+              <div className="text-sm font-bold">拡大プレビュー</div>
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="rounded-lg bg-slate-800 px-3 py-2 text-sm font-bold text-white"
+              >
+                閉じる
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-3">
+              <div className="w-[794px]">
+                <LetterSheetPreview
+                  preview={preview}
+                  bodySections={bodySections}
+                  showSample={true}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

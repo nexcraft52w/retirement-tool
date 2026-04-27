@@ -83,6 +83,7 @@ export default function RetirementDocumentToolMVP() {
     retirementDate: "",
   });
   const [isHydrated, setIsHydrated] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   useEffect(() => {
     try {
@@ -218,6 +219,8 @@ export default function RetirementDocumentToolMVP() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
+    setHasInteracted(true);
+
     const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
@@ -421,6 +424,7 @@ export default function RetirementDocumentToolMVP() {
   };
 
   const hasError = Object.values(errors).some(Boolean);
+  const showFieldErrors = hasInteracted;
 
   const missingItems = [
     errors.name ? "氏名" : null,
@@ -612,9 +616,9 @@ export default function RetirementDocumentToolMVP() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 text-slate-900 md:p-10">
+    <div className="min-h-screen bg-slate-50 p-4 text-slate-900 sm:p-6 md:p-10">
       <div className="mx-auto max-w-6xl space-y-8">
-        <section className="no-print rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <section className="no-print rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
           <h1 className="mb-4 text-3xl font-bold tracking-tight md:text-4xl">
             退職願・退職届を簡単に作成
           </h1>
@@ -638,7 +642,7 @@ export default function RetirementDocumentToolMVP() {
           </div>
         </section>
 
-        <section className="no-print rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <section className="no-print rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
           <h2 className="mb-5 text-2xl font-bold">文書タイプ</h2>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -690,19 +694,8 @@ export default function RetirementDocumentToolMVP() {
           </div>
         </section>
 
-        {hasError && (
-          <section className="no-print rounded-3xl border border-red-200 bg-red-50 p-5 text-red-700 shadow-sm">
-            <div className="mb-2 font-semibold">
-              未入力項目があります。印刷・PDF保存はできません。
-            </div>
-            <div className="text-sm leading-7">
-              未入力: {missingItems.join("、")}
-            </div>
-          </section>
-        )}
-
         <section className="no-print grid gap-6 md:grid-cols-2">
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
             <div className="mb-6 flex items-center justify-between gap-3">
               <h2 className="text-2xl font-bold">入力フォーム</h2>
               <button
@@ -724,12 +717,12 @@ export default function RetirementDocumentToolMVP() {
                   onChange={handleChange}
                   placeholder="例：氏名 花子"
                   className={`w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 ${
-                    errors.name
+                    showFieldErrors && errors.name
                       ? "border-red-300 focus:ring-red-200"
                       : "border-slate-300 focus:ring-slate-300"
                   }`}
                 />
-                {errors.name && (
+                {showFieldErrors && errors.name && (
                   <p className="mt-1 text-sm text-red-500">氏名は必須です</p>
                 )}
               </div>
@@ -743,12 +736,12 @@ export default function RetirementDocumentToolMVP() {
                   onChange={handleChange}
                   placeholder="例：営業部"
                   className={`w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 ${
-                    errors.department
+                    showFieldErrors && errors.department
                       ? "border-red-300 focus:ring-red-200"
                       : "border-slate-300 focus:ring-slate-300"
                   }`}
                 />
-                {errors.department && (
+                {showFieldErrors && errors.department && (
                   <p className="mt-1 text-sm text-red-500">所属部署名は必須です</p>
                 )}
               </div>
@@ -762,12 +755,12 @@ export default function RetirementDocumentToolMVP() {
                   onChange={handleChange}
                   placeholder="例：株式会社〇〇〇"
                   className={`w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 ${
-                    errors.companyName
+                    showFieldErrors && errors.companyName
                       ? "border-red-300 focus:ring-red-200"
                       : "border-slate-300 focus:ring-slate-300"
                   }`}
                 />
-                {errors.companyName && (
+                {showFieldErrors && errors.companyName && (
                   <p className="mt-1 text-sm text-red-500">会社名は必須です</p>
                 )}
               </div>
@@ -781,12 +774,12 @@ export default function RetirementDocumentToolMVP() {
                   onChange={handleChange}
                   placeholder="例：代表者 太郎"
                   className={`w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 ${
-                    errors.representativeName
+                    showFieldErrors && errors.representativeName
                       ? "border-red-300 focus:ring-red-200"
                       : "border-slate-300 focus:ring-slate-300"
                   }`}
                 />
-                {errors.representativeName && (
+                {showFieldErrors && errors.representativeName && (
                   <p className="mt-1 text-sm text-red-500">
                     代表取締役氏名は必須です
                   </p>
@@ -802,12 +795,12 @@ export default function RetirementDocumentToolMVP() {
                   min={todayString}
                   onChange={handleChange}
                   className={`w-full rounded-xl border px-4 py-3 outline-none focus:ring-2 ${
-                    errors.retirementDate
+                    showFieldErrors && errors.retirementDate
                       ? "border-red-300 focus:ring-red-200"
                       : "border-slate-300 focus:ring-slate-300"
                   }`}
                 />
-                {errors.retirementDate && (
+                {showFieldErrors && errors.retirementDate && (
                   <p className="mt-1 text-sm text-red-500">退職日は必須です</p>
                 )}
                 {!errors.retirementDate && (
@@ -819,7 +812,7 @@ export default function RetirementDocumentToolMVP() {
             </div>
           </div>
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
             <h2 className="mb-6 text-2xl font-bold">確認画面</h2>
 
             <div className="space-y-4 leading-7 text-slate-700">
@@ -864,15 +857,24 @@ export default function RetirementDocumentToolMVP() {
                     : "border-green-200 bg-green-50 text-green-800"
                 }`}
               >
-                {hasError
-                  ? "未入力項目があります。すべて入力するまで印刷・PDF保存はできません。"
-                  : "出力可能な状態です。"}
+                {hasError ? (
+                  <>
+                    <div className="font-semibold">
+                      未入力項目があります。すべて入力するまで印刷・PDF保存はできません。
+                    </div>
+                    <div className="mt-2 text-sm">
+                      未入力: {missingItems.join("、")}
+                    </div>
+                  </>
+                ) : (
+                  "出力可能な状態です。"
+                )}
               </div>
             </div>
           </div>
         </section>
 
-        <section className="print-section rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+        <section className="print-section rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-8">
           <div className="no-print mb-6">
             <h2 className="mb-2 text-2xl font-bold">{titleText}プレビュー</h2>
             <p className="text-sm text-slate-600">
@@ -880,84 +882,86 @@ export default function RetirementDocumentToolMVP() {
             </p>
           </div>
 
-          <div className="mb-8 overflow-x-auto">
-            <div
-              ref={printRef}
-              className="retirement-sheet relative mx-auto border border-slate-300 bg-white"
-              style={{
-                width: "210mm",
-                height: "297mm",
-                overflow: "hidden",
-              }}
-            >
-              <div className="absolute right-[12mm] top-[16mm] text-[28px] font-bold tracking-[0.12em] [text-orientation:upright] [writing-mode:vertical-rl]">
-                {titleText}
-              </div>
-
-              <div className="absolute right-[48mm] top-[42mm] text-[18px] leading-[1.9] [text-orientation:upright] [writing-mode:vertical-rl]">
-                私事
-              </div>
-
-              {documentType === "wish" ? (
-                <>
-                  <div className="absolute right-[78mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    一身上の都合により、
+          <div className="mb-8 flex justify-center overflow-hidden">
+            <div className="[zoom:0.42] sm:[zoom:0.62] md:[zoom:1]">
+              <div
+                ref={printRef}
+                  className="retirement-sheet relative mx-auto border border-slate-300 bg-white"
+                  style={{
+                    width: "210mm",
+                    height: "297mm",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div className="absolute right-[12mm] top-[16mm] text-[28px] font-bold tracking-[0.12em] [text-orientation:upright] [writing-mode:vertical-rl]">
+                    {titleText}
                   </div>
 
-                  <div className="absolute right-[88mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    <span
-                      className={`inline-block whitespace-nowrap ${
-                        formattedDate ? "text-slate-900" : "text-slate-400"
-                      }`}
-                    >
-                      {formattedDate || "〇年〇月〇日"}
+                  <div className="absolute right-[48mm] top-[42mm] text-[18px] leading-[1.9] [text-orientation:upright] [writing-mode:vertical-rl]">
+                    私事
+                  </div>
+
+                  {documentType === "wish" ? (
+                    <>
+                      <div className="absolute right-[78mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                        一身上の都合により、
+                      </div>
+
+                      <div className="absolute right-[88mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                        <span
+                          className={`inline-block whitespace-nowrap ${
+                            formattedDate ? "text-slate-900" : "text-slate-400"
+                          }`}
+                        >
+                          {formattedDate || "〇年〇月〇日"}
+                        </span>
+                        をもって、退職いたしたく、
+                      </div>
+
+                      <div className="absolute right-[98mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                        ここにお願い申し上げます。
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="absolute right-[72mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                        一身上の都合により、
+                      </div>
+
+                      <div className="absolute right-[88mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                        <span
+                          className={`inline-block whitespace-nowrap ${
+                            formattedDate ? "text-slate-900" : "text-slate-400"
+                          }`}
+                        >
+                          {formattedDate || "〇年〇月〇日"}
+                        </span>
+                        をもって、退職いたします。
+                      </div>
+                    </>
+                  )}
+
+                  <div className="absolute right-[120mm] top-[185mm] whitespace-nowrap text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                    <span className={formattedDate ? "text-slate-900" : "text-red-500"}>
+                      {formattedDate || "日付未入力"}
                     </span>
-                    をもって、退職いたしたく、
                   </div>
 
-                  <div className="absolute right-[98mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    ここにお願い申し上げます。
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="absolute right-[72mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    一身上の都合により、
+                  <div className="absolute right-[132mm] top-[190mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                    {form.department || "所属部署"}
                   </div>
 
-                  <div className="absolute right-[88mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    <span
-                      className={`inline-block whitespace-nowrap ${
-                        formattedDate ? "text-slate-900" : "text-slate-400"
-                      }`}
-                    >
-                      {formattedDate || "〇年〇月〇日"}
-                    </span>
-                    をもって、退職いたします。
+                  <div className="absolute right-[132mm] top-[225mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                    {form.name || "氏名"}
                   </div>
-                </>
-              )}
 
-              <div className="absolute right-[120mm] top-[185mm] whitespace-nowrap text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                <span className={formattedDate ? "text-slate-900" : "text-red-500"}>
-                  {formattedDate || "日付未入力"}
-                </span>
-              </div>
+                  <div className="absolute left-[46mm] top-[75mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                    {form.companyName || "株式会社〇〇〇"}
+                  </div>
 
-              <div className="absolute right-[132mm] top-[190mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                {form.department || "所属部署"}
-              </div>
-
-              <div className="absolute right-[132mm] top-[225mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                {form.name || "氏名"}
-              </div>
-
-              <div className="absolute left-[46mm] top-[75mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                {form.companyName || "株式会社〇〇〇"}
-              </div>
-
-              <div className="absolute left-[36mm] top-[75mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                {`代表取締役 ${form.representativeName || "代表者 太郎"} 殿`}
+                  <div className="absolute left-[36mm] top-[75mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                    {`代表取締役 ${form.representativeName || "代表者 太郎"} 殿`}
+                  </div>
               </div>
             </div>
           </div>
@@ -984,7 +988,7 @@ export default function RetirementDocumentToolMVP() {
           </div>
 
           <div className="no-print border-t border-slate-200 pt-6">
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:p-6">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <h3 className="text-lg font-bold text-slate-900">次の手続き</h3>
 
@@ -1001,7 +1005,7 @@ export default function RetirementDocumentToolMVP() {
                 </div>
               </div>
 
-              <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
                 <h2 className="mb-3 text-2xl font-bold">
                   会社とのやり取りを最小限にしたい方へ
                 </h2>
@@ -1011,7 +1015,7 @@ export default function RetirementDocumentToolMVP() {
                 </p>
 
                 <div className="mb-6 rounded-xl border border-blue-300 bg-blue-50 p-5">
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-800">
                         郵送セット
@@ -1021,12 +1025,12 @@ export default function RetirementDocumentToolMVP() {
                       </div>
                     </div>
 
-                    <div className="shrink-0 text-right">
+                    <div className="shrink-0 text-left sm:text-right">
                       <div className="text-sm text-slate-500 line-through">
                         1,500円
                       </div>
                       <div className="text-xl font-bold text-blue-700">
-                        5/9まで無料
+                        今だけ無料公開中
                       </div>
                     </div>
                   </div>
@@ -1050,7 +1054,7 @@ export default function RetirementDocumentToolMVP() {
                 </button>
               </div>
 
-              <div className="mt-6 rounded-2xl border border-orange-200 bg-orange-50 p-6">
+              <div className="mt-6 rounded-2xl border border-orange-200 bg-orange-50 p-5 sm:p-6">
                 <h3 className="mb-2 text-lg font-bold text-slate-900">
                   退職エピソード投稿
                 </h3>
@@ -1062,17 +1066,17 @@ export default function RetirementDocumentToolMVP() {
                 </p>
 
                 <div className="mb-4 rounded-xl border border-orange-300 bg-white p-4">
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-800">
                         郵送補助の割引対象
                       </div>
                       <div className="text-xs text-slate-500">
-                        5/9までは、郵送補助 0円
+                        今だけ無料公開中
                       </div>
                     </div>
 
-                    <div className="shrink-0 text-right">
+                    <div className="shrink-0 text-left sm:text-right">
                       <div className="text-sm text-slate-500 line-through">
                         1,500円
                       </div>

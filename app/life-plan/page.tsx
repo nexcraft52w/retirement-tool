@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useMemo, useState } from "react";
 
 type FormState = {
@@ -17,6 +18,24 @@ type MonthRow = {
   income: number;
   expense: number;
   balance: number;
+};
+
+type CtaLink = {
+  label: string;
+  href: string;
+  disabled?: boolean;
+};
+
+const AFFILIATE_LINKS = {
+  fullcast: "#", // 承認後：フルキャストのA8広告リンクに差し替え
+  sumijob: "#", // 承認後：スミジョブのA8広告リンクに差し替え
+  moving: "#", // 承認後：引越し侍のA8広告リンクに差し替え
+};
+
+const AFFILIATE_READY = {
+  fullcast: false,
+  sumijob: false,
+  moving: false,
 };
 
 function toNumber(value: string) {
@@ -110,7 +129,11 @@ export default function LifePlanPage() {
       monthsLeft = 0;
     } else if (monthsLeft !== null) {
       const now = new Date();
-      const zeroDate = new Date(now.getFullYear(), now.getMonth() + monthsLeft, 1);
+      const zeroDate = new Date(
+        now.getFullYear(),
+        now.getMonth() + monthsLeft,
+        1
+      );
       zeroMonthDateText = `${formatMonthLabel(zeroDate)}ごろ`;
     }
 
@@ -147,48 +170,87 @@ export default function LifePlanPage() {
       title: "text-blue-900",
       body: "text-blue-900/80",
       note: "text-blue-900/70",
-      primary:
-        "bg-blue-600 text-white hover:bg-blue-700",
+      primary: "bg-blue-600 text-white hover:bg-blue-700",
       secondary:
         "border-blue-300 bg-white text-blue-700 hover:bg-blue-100",
-      heading: "収入の確保も検討しておきましょう",
+      heading: "収入と固定費の見直しも検討しておきましょう",
       text:
-        "余裕があるうちから、短時間の仕事やアルバイトなど、次の収入源も候補として見ておくと安心です。",
-      mainLabel: "アルバイトを見る",
-      sub1Label: "短期バイト",
-      sub2Label: "在宅ワーク",
+        "余裕があるうちから、日払い・単発バイト、寮付き求人、家賃を下げる選択肢を確認しておくと安心です。",
+      links: [
+        {
+          label: "日払い・単発バイトを見る",
+          href: AFFILIATE_LINKS.fullcast,
+          disabled: !AFFILIATE_READY.fullcast,
+        },
+        {
+          label: "寮付き求人を見る",
+          href: AFFILIATE_LINKS.sumijob,
+          disabled: !AFFILIATE_READY.sumijob,
+        },
+        {
+          label: "引越し料金を比較する",
+          href: AFFILIATE_LINKS.moving,
+          disabled: !AFFILIATE_READY.moving,
+        },
+      ] as CtaLink[],
     },
     warning: {
       wrap: "border-amber-200 bg-amber-50",
       title: "text-amber-900",
       body: "text-amber-900/80",
       note: "text-amber-900/70",
-      primary:
-        "bg-amber-500 text-white hover:bg-amber-600",
+      primary: "bg-amber-500 text-white hover:bg-amber-600",
       secondary:
         "border-amber-300 bg-white text-amber-700 hover:bg-amber-100",
       heading: `このままだと資金は${simulation.monthsLeft ?? ""}か月で尽きます`,
       text:
-        "失業保険の終了前から、収入の入る仕事を候補として見ておくのが安全です。",
-      mainLabel: "今すぐ仕事を探す",
-      sub1Label: "短期で探す",
-      sub2Label: "日払いで探す",
+        "失業保険の終了前から、収入を増やす方法と、家賃など固定費を下げる方法を両方見ておくのが安全です。",
+      links: [
+        {
+          label: "日払いで探す",
+          href: AFFILIATE_LINKS.fullcast,
+          disabled: !AFFILIATE_READY.fullcast,
+        },
+        {
+          label: "寮付き求人を見る",
+          href: AFFILIATE_LINKS.sumijob,
+          disabled: !AFFILIATE_READY.sumijob,
+        },
+        {
+          label: "引越し料金を比較する",
+          href: AFFILIATE_LINKS.moving,
+          disabled: !AFFILIATE_READY.moving,
+        },
+      ] as CtaLink[],
     },
     danger: {
       wrap: "border-rose-200 bg-rose-50",
       title: "text-rose-900",
       body: "text-rose-900/80",
       note: "text-rose-900/70",
-      primary:
-        "bg-rose-600 text-white hover:bg-rose-700",
+      primary: "bg-rose-600 text-white hover:bg-rose-700",
       secondary:
         "border-rose-300 bg-white text-rose-700 hover:bg-rose-100",
       heading: `資金は${simulation.monthsLeft ?? ""}か月以内に尽きます`,
       text:
-        "すぐに収入を確保できる仕事を探してください。日払い・短期・寮付き求人も候補です。",
-      mainLabel: "今すぐ仕事を探す",
-      sub1Label: "日払いで探す",
-      sub2Label: "寮付き求人を見る",
+        "すぐに収入を確保できる仕事を探してください。日払い・単発・寮付き求人に加えて、家賃負担を下げる選択肢も確認しておくと安全です。",
+      links: [
+        {
+          label: "日払いで探す",
+          href: AFFILIATE_LINKS.fullcast,
+          disabled: !AFFILIATE_READY.fullcast,
+        },
+        {
+          label: "寮付き求人を見る",
+          href: AFFILIATE_LINKS.sumijob,
+          disabled: !AFFILIATE_READY.sumijob,
+        },
+        {
+          label: "引越し料金を比較する",
+          href: AFFILIATE_LINKS.moving,
+          disabled: !AFFILIATE_READY.moving,
+        },
+      ] as CtaLink[],
     },
   }[ctaLevel];
 
@@ -292,15 +354,21 @@ export default function LifePlanPage() {
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span>その他固定費</span>
-                  <span className="font-semibold">{formatYen(values.livingCost)}円</span>
+                  <span className="font-semibold">
+                    {formatYen(values.livingCost)}円
+                  </span>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span>月の食費</span>
-                  <span className="font-semibold">{formatYen(values.foodCost)}円</span>
+                  <span className="font-semibold">
+                    {formatYen(values.foodCost)}円
+                  </span>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span>月のその他支出</span>
-                  <span className="font-semibold">{formatYen(values.miscCost)}円</span>
+                  <span className="font-semibold">
+                    {formatYen(values.miscCost)}円
+                  </span>
                 </div>
 
                 <div className="mt-2 border-t border-slate-200 pt-3">
@@ -429,38 +497,20 @@ export default function LifePlanPage() {
               </p>
 
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <a
-                  href="https://jp.indeed.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition ${ctaConfig.primary}`}
-                >
-                  {ctaConfig.mainLabel}
-                </a>
-                <a
-                  href="https://timee.co.jp/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`inline-flex items-center justify-center rounded-xl border px-5 py-3 text-sm font-semibold transition ${ctaConfig.secondary}`}
-                >
-                  {ctaConfig.sub1Label}
-                </a>
-                <a
-                  href="https://crowdworks.jp/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`inline-flex items-center justify-center rounded-xl border px-5 py-3 text-sm font-semibold transition ${ctaConfig.secondary}`}
-                >
-                  {ctaConfig.sub2Label}
-                </a>
+                {ctaConfig.links.map((link, index) => (
+                  <CtaButton
+                    key={link.label}
+                    link={link}
+                    className={index === 0 ? ctaConfig.primary : ctaConfig.secondary}
+                    isPrimary={index === 0}
+                  />
+                ))}
               </div>
 
               <p className={`mt-3 text-xs ${ctaConfig.note}`}>
-                ※一部機能は現在開発中のため、内容が変更される場合があります。
+                ※現在一部リンクは準備中です。提携承認後に利用できるようになります。
               </p>
             </div>
-
-
 
             <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
               <h2 className="text-lg font-bold">残高の推移</h2>
@@ -505,31 +555,32 @@ export default function LifePlanPage() {
               </p>
             </div>
 
-                          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-slate-900">
-                  家賃を抑える選択肢もあります
-                </h2>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900">
+                家賃を抑える選択肢もあります
+              </h2>
 
-                <p className="mt-3 text-sm text-slate-600 leading-6">
-                  資金が減る前に、寮付き・住み込みの仕事も候補として確認しておくと安心です。
-                </p>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                資金が減る前に、住まいの固定費を下げる選択肢も確認しておくと安心です。
+                家賃負担が大きい場合は、引越し費用を比較しておくことも検討できます。
+              </p>
 
               <div className="mt-5">
-                <a
-                  href="https://www.sumikominavi.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition"
-                >
-                住み込み求人ナビを見る
-                </a>
+                <CtaButton
+                  link={{
+                    label: "引越し料金を比較する",
+                    href: AFFILIATE_LINKS.moving,
+                    disabled: !AFFILIATE_READY.moving,
+                  }}
+                  className="bg-slate-900 text-white hover:bg-slate-800"
+                  isFullWidth
+                />
               </div>
 
               <p className="mt-3 text-xs text-slate-500">
-                ※住み込み・寮付き求人の外部サイトへ移動します
+                ※現在準備中です。提携承認後に外部サイトへ移動できるようになります。
               </p>
-              </div>
-
+            </div>
           </section>
         </div>
       </div>
@@ -593,5 +644,44 @@ function ResultCard({
       </p>
       <p className="mt-2 text-xs text-slate-500">{sub}</p>
     </div>
+  );
+}
+
+function CtaButton({
+  link,
+  className,
+  isPrimary = false,
+  isFullWidth = false,
+}: {
+  link: CtaLink;
+  className: string;
+  isPrimary?: boolean;
+  isFullWidth?: boolean;
+}) {
+  const baseClass = `inline-flex items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold transition ${
+    isPrimary ? "" : "border"
+  } ${isFullWidth ? "w-full" : ""}`;
+
+  if (link.disabled) {
+    return (
+      <button
+        type="button"
+        disabled
+        className={`${baseClass} cursor-not-allowed opacity-70 ${className}`}
+      >
+        {link.label}（準備中）
+      </button>
+    );
+  }
+
+  return (
+    <a
+      href={link.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`${baseClass} ${className}`}
+    >
+      {link.label}
+    </a>
   );
 }

@@ -343,6 +343,10 @@ async function buildLetterpackPdf(formInput: LetterpackForm): Promise<Uint8Array
   return pdfDoc.save();
 }
 
+function makePreviewSrc(previewUrl: string, zoom: number) {
+  return `${previewUrl}#toolbar=1&navpanes=0&scrollbar=1&zoom=${zoom}`;
+}
+
 export default function LetterpackPage() {
   const [form, setForm] = useState<LetterpackForm>(emptyForm);
   const [loaded, setLoaded] = useState(false);
@@ -353,6 +357,7 @@ export default function LetterpackPage() {
   });
   const [previewUrl, setPreviewUrl] = useState("");
   const [isBuildingPdf, setIsBuildingPdf] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const previewUrlRef = useRef("");
   const lastFetchedCompanyZipRef = useRef("");
@@ -559,7 +564,7 @@ export default function LetterpackPage() {
 
   return (
     <main className="min-h-screen bg-slate-100">
-      <div className="mx-auto max-w-[1400px] p-6">
+      <div className="mx-auto max-w-[1400px] p-4 sm:p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">レターパック入力・出力</h1>
         </div>
@@ -711,18 +716,30 @@ export default function LetterpackPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl bg-white p-5 shadow">
+          <section className="rounded-2xl bg-white p-4 shadow sm:p-5">
             <h2 className="mb-4 text-lg font-semibold">PDFプレビュー</h2>
 
             <div className="overflow-hidden rounded-xl border bg-slate-50">
               {previewUrl ? (
-                <iframe
-                  title="letterpack-pdf-preview"
-                  src={previewUrl}
-                  className="h-[980px] w-full"
-                />
+                <>
+                  <iframe
+                    title="letterpack-pdf-preview"
+                    src={makePreviewSrc(previewUrl, 35)}
+                    className="h-[520px] w-full md:h-[980px]"
+                  />
+
+                  <div className="border-t bg-white p-3 md:hidden">
+                    <button
+                      type="button"
+                      onClick={() => setIsPreviewOpen(true)}
+                      className="w-full rounded-lg bg-slate-900 px-4 py-3 text-sm font-semibold text-white"
+                    >
+                      拡大して確認する
+                    </button>
+                  </div>
+                </>
               ) : (
-                <div className="flex h-[980px] items-center justify-center text-sm text-slate-500">
+                <div className="flex h-[520px] items-center justify-center text-sm text-slate-500 md:h-[980px]">
                   プレビュー生成中...
                 </div>
               )}
@@ -734,6 +751,29 @@ export default function LetterpackPage() {
           </section>
         </div>
       </div>
+
+      {isPreviewOpen && previewUrl ? (
+        <div className="fixed inset-0 z-50 bg-black/70 p-3">
+          <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <p className="text-sm font-semibold">PDF拡大プレビュー</p>
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(false)}
+                className="rounded-lg border px-3 py-1 text-sm"
+              >
+                閉じる
+              </button>
+            </div>
+
+            <iframe
+              title="letterpack-pdf-preview-expanded"
+              src={makePreviewSrc(previewUrl, 90)}
+              className="w-full flex-1"
+            />
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }
