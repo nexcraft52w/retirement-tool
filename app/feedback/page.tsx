@@ -6,7 +6,10 @@ import { useMemo, useState } from "react";
 type ResultStatus = "smooth" | "minor_trouble" | "major_trouble";
 type SubmitState = "idle" | "submitting" | "success" | "error";
 
-const RESULT_OPTIONS = [
+const RESULT_OPTIONS: {
+  value: ResultStatus;
+  title: string;
+}[] = [
   { value: "smooth", title: "問題なく退職" },
   { value: "minor_trouble", title: "少しトラブルがあったが、退職" },
   { value: "major_trouble", title: "かなり揉めた" },
