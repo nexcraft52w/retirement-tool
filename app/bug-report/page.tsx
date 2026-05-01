@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
+
 
 export default function BugReportPage() {
   const [category, setCategory] = useState("");
@@ -22,23 +22,25 @@ export default function BugReportPage() {
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.from("user_feedback").insert([
-      {
-        type: "bug",
-        rating: null,
-        category: category || null,
-        message: message.trim(),
-        page_path: window.location.pathname,
-        user_agent: navigator.userAgent,
-      },
-    ]);
+    const res = await fetch("/api/bug-report", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    category,
+    message: message.trim(),
+    pagePath: window.location.pathname,
+    userAgent: navigator.userAgent,
+  }),
+});
 
-    setLoading(false);
+setLoading(false);
 
-    if (error) {
-      setError("送信できませんでした。時間をおいて再度お試しください。");
-      return;
-    }
+if (!res.ok) {
+  setError("送信できませんでした。時間をおいて再度お試しください。");
+  return;
+}
 
     setDone(true);
     setCategory("");
