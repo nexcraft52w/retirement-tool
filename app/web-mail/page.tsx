@@ -187,6 +187,7 @@ const WEB_MAIL_FORM_STORAGE_KEY = "web-mail-form-v1";
 const WEB_MAIL_NEXT_HANDOFF_KEY = "web-mail-next-handoff-v1";
 const LETTERPACK_HANDOFF_KEY = "letterpack-handoff-v1";
 const CHECKOUT_HANDOFF_KEY = "checkout-handoff-v1";
+const SESSION_ID_KEY = "retirement-session-id-v1";
 
 const WEB_MAIL_BASE_PRICE = 1500;
 
@@ -231,6 +232,23 @@ const withSingleSama = (value: string) => {
   const t = (value ?? "").trim();
   if (!t) return "ご担当者様";
   return t.replace(/様+$/, "") + "様";
+};
+
+const getSessionId = () => {
+  try {
+    const existing = localStorage.getItem(SESSION_ID_KEY);
+    if (existing) return existing;
+
+    const next =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    localStorage.setItem(SESSION_ID_KEY, next);
+    return next;
+  } catch {
+    return "";
+  }
 };
 
 function buildRequestedDocsBlock(baseDocs: string[], extraDocs: string[]) {
@@ -362,14 +380,17 @@ export default function WebMailPage() {
   const [isRestored, setIsRestored] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
-  const sendCount = async (type: "view" | "postal") => {
+  const sendCount = async (type: "view" | "pdf" | "postal") => {
     try {
       await fetch("/api/count", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ type }),
+        body: JSON.stringify({
+          type,
+          sessionId: getSessionId(),
+        }),
       });
     } catch {
       //
@@ -1153,7 +1174,7 @@ export default function WebMailPage() {
                   <div
                     className="mx-auto w-fit origin-top"
                     style={{
-                      zoom: 0.40                      
+                      zoom: 0.40,
                     }}
                   >
                     <LetterSheetPreview
@@ -1193,7 +1214,6 @@ export default function WebMailPage() {
                   type="button"
                   disabled={!canGenerate}
                   onClick={() => {
-                    sendCount("postal");
                     saveHandoffData();
 
                     sessionStorage.setItem("web-mail-paid", "true");

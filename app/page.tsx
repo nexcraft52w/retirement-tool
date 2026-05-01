@@ -20,6 +20,7 @@ const RETIREMENT_FORM_STORAGE_KEY = "retirement-document-form-v1";
 const POSTAL_HANDOFF_KEY = "postal-discount-handoff-v1";
 const WEB_MAIL_FORM_STORAGE_KEY = "web-mail-form-v1";
 const COUNT_KEY = "retirement-counted-v1";
+const SESSION_ID_KEY = "retirement-session-id-v1";
 
 const POSTAL_BASE_PRICE = 1500;
 const FREE_CAMPAIGN = true;
@@ -68,6 +69,37 @@ const toKanjiYear = (year: number) => {
     .split("")
     .map((digit) => KANJI_DIGITS[Number(digit)])
     .join("");
+};
+
+const getSessionId = () => {
+  try {
+    const existing = localStorage.getItem(SESSION_ID_KEY);
+    if (existing) return existing;
+
+    const next =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    localStorage.setItem(SESSION_ID_KEY, next);
+    return next;
+  } catch {
+    return "";
+  }
+};
+
+const countAccess = (type: string) => {
+  const sessionId = getSessionId();
+
+  fetch("/api/count", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ type, sessionId }),
+  }).catch(() => {
+    // 計測失敗でも画面動作は継続
+  });
 };
 
 export default function RetirementDocumentToolMVP() {
@@ -184,16 +216,7 @@ export default function RetirementDocumentToolMVP() {
     const counted = sessionStorage.getItem(COUNT_KEY);
     if (counted) return;
 
-    fetch("/api/count", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ type: "view" }),
-    }).catch(() => {
-      // 計測失敗でも画面動作は継続
-    });
-
+    countAccess("view");
     sessionStorage.setItem(COUNT_KEY, "1");
   }, []);
 
@@ -252,15 +275,7 @@ export default function RetirementDocumentToolMVP() {
       return;
     }
 
-    fetch("/api/count", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ type: "pdf" }),
-    }).catch(() => {
-      // 計測失敗でも出力は続行
-    });
+    countAccess("pdf");
 
     const html = printRef.current.outerHTML;
 
@@ -598,15 +613,7 @@ export default function RetirementDocumentToolMVP() {
   const handlePostalSupport = () => {
     saveCurrentRetirementData();
 
-    fetch("/api/count", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ type: "postal" }),
-    }).catch(() => {
-      // 計測失敗でも遷移は続行
-    });
+    countAccess("postal");
 
     sessionStorage.setItem(
       POSTAL_HANDOFF_KEY,
@@ -886,82 +893,82 @@ export default function RetirementDocumentToolMVP() {
             <div className="[zoom:0.42] sm:[zoom:0.62] md:[zoom:1]">
               <div
                 ref={printRef}
-                  className="retirement-sheet relative mx-auto border border-slate-300 bg-white"
-                  style={{
-                    width: "210mm",
-                    height: "297mm",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div className="absolute right-[12mm] top-[16mm] text-[28px] font-bold tracking-[0.12em] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    {titleText}
-                  </div>
+                className="retirement-sheet relative mx-auto border border-slate-300 bg-white"
+                style={{
+                  width: "210mm",
+                  height: "297mm",
+                  overflow: "hidden",
+                }}
+              >
+                <div className="absolute right-[12mm] top-[16mm] text-[28px] font-bold tracking-[0.12em] [text-orientation:upright] [writing-mode:vertical-rl]">
+                  {titleText}
+                </div>
 
-                  <div className="absolute right-[48mm] top-[42mm] text-[18px] leading-[1.9] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    私事
-                  </div>
+                <div className="absolute right-[48mm] top-[42mm] text-[18px] leading-[1.9] [text-orientation:upright] [writing-mode:vertical-rl]">
+                  私事
+                </div>
 
-                  {documentType === "wish" ? (
-                    <>
-                      <div className="absolute right-[78mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                        一身上の都合により、
-                      </div>
+                {documentType === "wish" ? (
+                  <>
+                    <div className="absolute right-[78mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                      一身上の都合により、
+                    </div>
 
-                      <div className="absolute right-[88mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                        <span
-                          className={`inline-block whitespace-nowrap ${
-                            formattedDate ? "text-slate-900" : "text-slate-400"
-                          }`}
-                        >
-                          {formattedDate || "〇年〇月〇日"}
-                        </span>
-                        をもって、退職いたしたく、
-                      </div>
+                    <div className="absolute right-[88mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                      <span
+                        className={`inline-block whitespace-nowrap ${
+                          formattedDate ? "text-slate-900" : "text-slate-400"
+                        }`}
+                      >
+                        {formattedDate || "〇年〇月〇日"}
+                      </span>
+                      をもって、退職いたしたく、
+                    </div>
 
-                      <div className="absolute right-[98mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                        ここにお願い申し上げます。
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="absolute right-[72mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                        一身上の都合により、
-                      </div>
+                    <div className="absolute right-[98mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                      ここにお願い申し上げます。
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="absolute right-[72mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                      一身上の都合により、
+                    </div>
 
-                      <div className="absolute right-[88mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
-                        <span
-                          className={`inline-block whitespace-nowrap ${
-                            formattedDate ? "text-slate-900" : "text-slate-400"
-                          }`}
-                        >
-                          {formattedDate || "〇年〇月〇日"}
-                        </span>
-                        をもって、退職いたします。
-                      </div>
-                    </>
-                  )}
+                    <div className="absolute right-[88mm] top-[28mm] whitespace-pre-line text-[18px] leading-[2.15] [text-orientation:upright] [writing-mode:vertical-rl]">
+                      <span
+                        className={`inline-block whitespace-nowrap ${
+                          formattedDate ? "text-slate-900" : "text-slate-400"
+                        }`}
+                      >
+                        {formattedDate || "〇年〇月〇日"}
+                      </span>
+                      をもって、退職いたします。
+                    </div>
+                  </>
+                )}
 
-                  <div className="absolute right-[120mm] top-[185mm] whitespace-nowrap text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    <span className={formattedDate ? "text-slate-900" : "text-red-500"}>
-                      {formattedDate || "日付未入力"}
-                    </span>
-                  </div>
+                <div className="absolute right-[120mm] top-[185mm] whitespace-nowrap text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                  <span className={formattedDate ? "text-slate-900" : "text-red-500"}>
+                    {formattedDate || "日付未入力"}
+                  </span>
+                </div>
 
-                  <div className="absolute right-[132mm] top-[190mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    {form.department || "所属部署"}
-                  </div>
+                <div className="absolute right-[132mm] top-[190mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                  {form.department || "所属部署"}
+                </div>
 
-                  <div className="absolute right-[132mm] top-[225mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    {form.name || "氏名"}
-                  </div>
+                <div className="absolute right-[132mm] top-[225mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                  {form.name || "氏名"}
+                </div>
 
-                  <div className="absolute left-[46mm] top-[75mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    {form.companyName || "株式会社〇〇〇"}
-                  </div>
+                <div className="absolute left-[46mm] top-[75mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                  {form.companyName || "株式会社〇〇〇"}
+                </div>
 
-                  <div className="absolute left-[36mm] top-[75mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
-                    {`代表取締役 ${form.representativeName || "代表者 太郎"} 殿`}
-                  </div>
+                <div className="absolute left-[36mm] top-[75mm] text-[17px] leading-[2.2] [text-orientation:upright] [writing-mode:vertical-rl]">
+                  {`代表取締役 ${form.representativeName || "代表者 太郎"} 殿`}
+                </div>
               </div>
             </div>
           </div>
