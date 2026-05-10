@@ -40,6 +40,8 @@ type WebMailForm = {
   belongingsNote: string;
 
   residentTaxType: ResidentTaxType;
+
+  healthConditionNote: boolean;
 };
 
 type WebMailSavedState = {
@@ -130,6 +132,7 @@ type PreviewData = {
   requestedDocsBase: string[];
   requestedDocsExtra: string[];
   residentTaxText: string;
+  healthConditionNote: boolean;
 };
 
 type NextPageAddressHandoff = {
@@ -216,6 +219,7 @@ const emptyForm: WebMailForm = {
   belongingsNote: "",
 
   residentTaxType: "none",
+  healthConditionNote: false,
 };
 
 const normalizeZip = (value: string) => {
@@ -270,7 +274,13 @@ function buildLetterBodySections(preview: PreviewData) {
 
   sections.push("拝啓");
 
-  sections.push("お世話になっております。\n退職に伴う書類を送付いたします。");
+  sections.push(
+    `お世話になっております。\n退職に伴う書類を送付いたします。${
+      preview.healthConditionNote
+        ? "\nなお、体調不良により勤務継続が困難な状況です。\n以後のご連絡は書面または郵送にてお願いいたします。"
+        : ""
+    }`
+  );
 
   if (preview.belongingsMode === "request") {
     sections.push(
@@ -503,6 +513,7 @@ export default function WebMailPage() {
         ...nextForm,
         itemName: nextForm.itemName ?? "書類",
         pensionDocType: nextForm.pensionDocType ?? "none",
+        healthConditionNote: nextForm.healthConditionNote ?? false,
       });
 
       setCompanyName(nextCompanyName);
@@ -539,6 +550,7 @@ export default function WebMailPage() {
       ...targetForm,
       itemName: targetForm.itemName || "書類",
       pensionDocType: targetForm.pensionDocType || "none",
+      healthConditionNote: targetForm.healthConditionNote ?? false,
     };
 
     const payload: WebMailSavedState = {
@@ -675,6 +687,7 @@ export default function WebMailPage() {
       requestedDocsBase,
       requestedDocsExtra,
       residentTaxText,
+      healthConditionNote: form.healthConditionNote,
     };
   }, [
     form,
@@ -910,6 +923,26 @@ export default function WebMailPage() {
                 onChange={handleChange("itemName")}
                 placeholder="書類"
               />
+
+              <hr />
+
+              <div>
+                <div className="mb-2 block text-lg font-bold">退職理由の補足</div>
+                <label className="flex items-start gap-2 text-base leading-7">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={form.healthConditionNote}
+                    onChange={handleChange("healthConditionNote")}
+                  />
+                  <span>
+                    体調不良により勤務継続が困難である旨を記載する
+                    <span className="block text-sm text-slate-500">
+                      本文冒頭の「退職に伴う書類を送付いたします。」の直後に追記されます。
+                    </span>
+                  </span>
+                </label>
+              </div>
 
               <hr />
 

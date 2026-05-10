@@ -17,6 +17,7 @@ type WebMailForm = {
   senderAddress1: string;
   senderAddress2: string;
   itemName: string;
+  healthConditionNote: boolean;
   returnItemsMode: ReturnItemsMode;
   returnItemsNote: string;
   depositDocsMode: DepositDocsMode;
@@ -164,7 +165,19 @@ function buildCoverLetterSections(handoff: CheckoutHandoff) {
       : "";
 
   sections.push("拝啓");
-  sections.push("お世話になっております。\n退職に伴う書類を送付いたします。");
+
+  const openingLines = [
+    "お世話になっております。",
+    "退職に伴う書類を送付いたします。",
+  ];
+
+  if (form.healthConditionNote) {
+    openingLines.push(
+      "なお、体調不良により勤務継続が困難な状況です。\n以後のご連絡は書面または郵送にてお願いいたします。"
+    );
+  }
+
+  sections.push(openingLines.join("\n"));
 
   if (form.belongingsMode === "request") {
     sections.push(
