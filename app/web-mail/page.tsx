@@ -519,7 +519,7 @@ export default function WebMailPage() {
         nextCompanyAddress = saved.companyAddress || "";
         nextSenderName = saved.name || "";
         nextForm.senderAddress1 = saved.address || "";
-        nextForm.department = saved.department || "";
+        nextForm.department = "";
       }
 
       if (retirementHandoff) {
@@ -528,16 +528,8 @@ export default function WebMailPage() {
           retirementHandoff.companyAddress || nextCompanyAddress;
         nextSenderName = retirementHandoff.senderName || nextSenderName;
 
-        nextForm.department =
-          retirementHandoff.senderDepartment || nextForm.department;
-
         if (!nextForm.senderAddress1) {
           nextForm.senderAddress1 = retirementHandoff.senderAddress || "";
-        }
-
-        if (!nextForm.recipientName) {
-          nextForm.recipientName =
-            retirementHandoff.representativeName || nextForm.recipientName;
         }
       }
 
@@ -551,9 +543,6 @@ export default function WebMailPage() {
           episodeHandoff.retirementForm?.companyAddress || nextCompanyAddress;
 
         nextSenderName = episodeHandoff.retirementForm?.name || nextSenderName;
-
-        nextForm.department =
-          episodeHandoff.retirementForm?.department || nextForm.department;
 
         if (!nextForm.senderAddress1) {
           nextForm.senderAddress1 =
