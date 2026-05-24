@@ -7,16 +7,37 @@ const EPISODE_BASE_PRICE = 1500;
 const EPISODE_POST_DISCOUNT = 300;
 const AI_POLISH_DISCOUNT = 200;
 
-const RETIREMENT_DRAFT_KEY = "retirement-document-draft-v1";
-const RETIREMENT_HANDOFF_KEY = "postal-discount-handoff-v1";
-const EPISODE_HANDOFF_KEY = "episode-discount-handoff-v1";
-const EPISODE_DRAFT_KEY = "episode-page-draft-v1";
+const STORAGE_KEYS = {
+  retirementDraft: "retirement-document-draft-v1",
+  retirementHandoff: "postal-discount-handoff-v1",
+  episodeHandoff: "episode-discount-handoff-v1",
+  episodeDraft: "episode-page-draft-v1",
+} as const;
+
+const ROUTES = {
+  top: "/",
+  webMail: "/web-mail",
+} as const;
+
+const API_ENDPOINTS = {
+  episodePolish: "/api/episode-polish",
+  episodeSubmit: "/api/episode-submit",
+} as const;
 
 const MIN_PEN_NAME = 1;
 const MIN_SUBJECT = 4;
 const MIN_BODY = 150;
 const MAX_BODY = 3000;
-const MAX_AI_POLISH_TRIES = 999;
+const MAX_AI_POLISH_TRIES = 3;
+
+const PUBLIC_IMAGE_BASE = "/images/taishoku-baasama";
+
+const IMAGE_PATHS = {
+  headerBanner: `${PUBLIC_IMAGE_BASE}/taishoku-tool-header-banner.png`,
+  halfGuide: `${PUBLIC_IMAGE_BASE}/taishoku-baasama-half-guide.png`,
+  halfPoint: `${PUBLIC_IMAGE_BASE}/taishoku-baasama-half-point.png`,
+  standingGuide: `${PUBLIC_IMAGE_BASE}/taishoku-baasama-standing-guide.png`,
+} as const;
 
 const NG_WORDS = [
   "死ね",
@@ -326,7 +347,7 @@ export default function EpisodePage() {
 
   useEffect(() => {
     try {
-      const savedDraft = sessionStorage.getItem(EPISODE_DRAFT_KEY);
+      const savedDraft = sessionStorage.getItem(STORAGE_KEYS.episodeDraft);
       if (!savedDraft) return;
 
       const parsed = JSON.parse(savedDraft) as EpisodeDraft;
@@ -347,18 +368,26 @@ export default function EpisodePage() {
       );
 
       setEpisodeDiscountApplied(Boolean(parsed.episodeDiscountApplied));
-      setAiPolishDiscountApplied(Boolean(parsed.aiPolishDiscountApplied) && restoredSubmitted);
+      setAiPolishDiscountApplied(
+        Boolean(parsed.aiPolishDiscountApplied) &&
+          Boolean(parsed.aiPolishAdopted) &&
+          Boolean(parsed.polishedSnapshot)
+      );
 
-      setAiPolishExecuted(false);
-      setAiPolishAdopted(false);
-      setAiPolishTryCount(0);
+      setAiPolishExecuted(Boolean(parsed.aiPolishExecuted));
+      setAiPolishAdopted(Boolean(parsed.aiPolishAdopted));
+      setAiPolishTryCount(
+        typeof parsed.aiPolishTryCount === "number"
+          ? Math.min(Math.max(parsed.aiPolishTryCount, 0), MAX_AI_POLISH_TRIES)
+          : 0
+      );
 
-      setSubjectPreview("");
-      setNormalizedPreview("");
-      setNormalizedStressPreview("");
+      setSubjectPreview(parsed.subjectPreview ?? "");
+      setNormalizedPreview(parsed.normalizedPreview ?? "");
+      setNormalizedStressPreview(parsed.normalizedStressPreview ?? "");
 
-      setOriginalSnapshot(null);
-      setPolishedSnapshot(null);
+      setOriginalSnapshot(parsed.originalSnapshot ?? null);
+      setPolishedSnapshot(parsed.polishedSnapshot ?? null);
 
       setIsSubmitted(restoredSubmitted);
     } catch (error) {
@@ -368,7 +397,7 @@ export default function EpisodePage() {
 
   useEffect(() => {
     try {
-      const handoffRaw = sessionStorage.getItem(RETIREMENT_HANDOFF_KEY);
+      const handoffRaw = sessionStorage.getItem(STORAGE_KEYS.retirementHandoff);
       if (handoffRaw) {
         const handoff = JSON.parse(handoffRaw) as RetirementHandoffPayload;
         setRetirementForm({
@@ -383,7 +412,7 @@ export default function EpisodePage() {
         return;
       }
 
-      const draftRaw = sessionStorage.getItem(RETIREMENT_DRAFT_KEY);
+      const draftRaw = sessionStorage.getItem(STORAGE_KEYS.retirementDraft);
       if (draftRaw) {
         const draft = JSON.parse(draftRaw) as RetirementDraftPayload;
         setRetirementForm(draft.form ?? {});
@@ -422,7 +451,7 @@ export default function EpisodePage() {
         isSubmitted,
       };
 
-      sessionStorage.setItem(EPISODE_DRAFT_KEY, JSON.stringify(draft));
+      sessionStorage.setItem(STORAGE_KEYS.episodeDraft, JSON.stringify(draft));
     } catch (error) {
       console.error("failed to save episode draft", error);
     }
@@ -485,7 +514,7 @@ export default function EpisodePage() {
         stressRelief,
       };
 
-      const res = await fetch("/api/episode-polish", {
+      const res = await fetch(API_ENDPOINTS.episodePolish, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -590,7 +619,7 @@ export default function EpisodePage() {
         aiPolishDiscountApplied: nextAiPolishDiscountApplied,
       });
 
-      const response = await fetch("/api/episode-submit", {
+      const response = await fetch(API_ENDPOINTS.episodeSubmit, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -638,8 +667,8 @@ export default function EpisodePage() {
 
     try {
       const payload = buildHandoffPayload();
-      sessionStorage.setItem(EPISODE_HANDOFF_KEY, JSON.stringify(payload));
-      router.push("/web-mail");
+      sessionStorage.setItem(STORAGE_KEYS.episodeHandoff, JSON.stringify(payload));
+      router.push(ROUTES.webMail);
     } catch (error) {
       console.error("failed to save handoff payload", error);
       setSubmitMessage("次ページへの情報引き継ぎに失敗しました。もう一度お試しください。");
@@ -647,7 +676,7 @@ export default function EpisodePage() {
   };
 
   const handleBackToDocument = () => {
-    router.push("/");
+    router.push(ROUTES.top);
   };
 
   const handleReset = () => {
@@ -678,23 +707,55 @@ export default function EpisodePage() {
     setIsSubmitted(false);
 
     try {
-      sessionStorage.removeItem(EPISODE_DRAFT_KEY);
+      sessionStorage.removeItem(STORAGE_KEYS.episodeDraft);
     } catch (error) {
       console.error("failed to clear episode draft", error);
     }
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8">
+    <main className="min-h-screen bg-[#f8fafc] px-4 py-8">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-bold text-slate-900">退職エピソード投稿</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            退職届作成ページの情報を受け取り、割引情報を整理したうえで、次の郵送補助ページへ引き継ぎます。
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            投稿内容は、将来的に当HPへの掲載や動画化などに利用させていただく可能性があります。
-          </p>
+        <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <img
+            src={IMAGE_PATHS.headerBanner}
+            alt="退職ツール"
+            className="block h-auto w-full"
+          />
+        </div>
+
+        <div className="mb-8 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex min-h-[170px]">
+            <div className="min-w-0 flex-1 p-5 pr-2 sm:p-6">
+              <div className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">
+                退職ばあ様の投稿案内
+              </div>
+
+              <h1 className="mt-4 text-2xl font-bold text-slate-900">
+                退職エピソード投稿
+              </h1>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                退職届作成ページの情報を受け取り、割引情報を整理したうえで、次の郵送補助ページへ引き継ぎます。
+              </p>
+
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                投稿内容は、将来的に当HPへの掲載や動画化などに利用させていただく可能性があります。
+              </p>
+
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                書ける範囲で大丈夫です。個人名・会社名など、特定につながる内容は入れないでください。
+              </div>
+            </div>
+
+            <div className="relative w-[92px] flex-none overflow-hidden bg-gradient-to-br from-sky-50 via-white to-amber-50 sm:w-[140px] lg:w-[220px]">
+              <img
+                src={IMAGE_PATHS.halfGuide}
+                alt="退職ばあ様"
+                className="absolute bottom-0 right-[-10px] h-[145px] w-auto max-w-none object-contain sm:right-1 sm:h-[170px] lg:right-5 lg:h-[220px]"
+              />
+            </div>
+          </div>
         </div>
 
         {!retirementForm && (
@@ -708,7 +769,7 @@ export default function EpisodePage() {
         <div className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="space-y-6">
-              <div className="rounded-2xl bg-slate-100 p-4 text-xs leading-6 text-slate-600">
+              <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-xs leading-6 text-slate-600">
                 <div className="font-semibold text-slate-800">投稿前の確認</div>
                 <div className="mt-1">
                   ※件名は{MIN_SUBJECT}文字以上・本文は{MIN_BODY}文字以上。暴言、個人情報、URLは投稿できません。
@@ -1005,6 +1066,23 @@ export default function EpisodePage() {
                 投稿されたエピソードをまとめた一覧ページです。運用開始後に公開予定です。
               </p>
 
+              <div className="mt-4 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50">
+                <div className="flex items-end gap-3 p-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-slate-900">退職ばあ様より</div>
+                    <p className="mt-1 text-sm leading-6 text-slate-700">
+                      退職エピソード集は準備中です。公開まで、もう少し待っていてくださいね。
+                    </p>
+                  </div>
+
+                  <img
+                    src={IMAGE_PATHS.halfPoint}
+                    alt="退職ばあ様"
+                    className="h-[100px] w-auto flex-none object-contain sm:h-[120px]"
+                  />
+                </div>
+              </div>
+
               <button
                 type="button"
                 disabled
@@ -1012,6 +1090,23 @@ export default function EpisodePage() {
               >
                 退職エピソード集を見る（coming soon）
               </button>
+            </section>
+
+            <section className="hidden overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:block">
+              <div className="rounded-t-3xl bg-amber-50 px-6 py-4">
+                <div className="text-sm font-semibold text-slate-900">退職ばあ様より</div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  ここまで入力できたら、あとは投稿内容を確認して進めてくださいね。
+                </p>
+              </div>
+
+              <div className="flex justify-center bg-gradient-to-b from-white via-sky-50 to-amber-50 pt-6">
+                <img
+                  src={IMAGE_PATHS.standingGuide}
+                  alt="退職ばあ様"
+                  className="h-[500px] w-auto object-contain"
+                />
+              </div>
             </section>
           </aside>
         </div>

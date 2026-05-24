@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { PDFDocument, rgb } from "pdf-lib";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
+import { PDFDocument, PDFFont, PDFPage, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 
 type LetterpackHandoff = {
+  sessionId?: string;
   companyName: string;
   recipientName: string;
   companyZip: string;
@@ -28,6 +30,7 @@ type LetterpackForm = {
 
 const LETTERPACK_HANDOFF_KEY = "letterpack-handoff-v1";
 const LETTERPACK_FORM_KEY = "letterpack-form-v1";
+const SESSION_ID_KEY = "retirement-session-id-v1";
 
 const TEMPLATE_PDF_SRC = "/letter-pack-light.pdf";
 const FONT_SRC = "/fonts/NotoSansJP-Regular.ttf";
@@ -136,7 +139,9 @@ function sanitizeItemName(value?: string) {
   return trimmed || DEFAULT_ITEM_NAME;
 }
 
-function sanitizeForm(input?: Partial<LetterpackForm> | Partial<LetterpackHandoff>): LetterpackForm {
+function sanitizeForm(
+  input?: Partial<LetterpackForm> | Partial<LetterpackHandoff>
+): LetterpackForm {
   return {
     companyName: (input?.companyName || "").trim(),
     recipientName: (input?.recipientName || "").trim(),
@@ -152,7 +157,7 @@ function sanitizeForm(input?: Partial<LetterpackForm> | Partial<LetterpackHandof
 function wrapText(
   text: string,
   maxWidth: number,
-  font: any,
+  font: PDFFont,
   fontSize: number
 ): string[] {
   const lines: string[] = [];
@@ -192,12 +197,12 @@ function wrapText(
 }
 
 function drawWrappedText(params: {
-  page: any;
+  page: PDFPage;
   text: string;
   x: number;
   top: number;
   width: number;
-  font: any;
+  font: PDFFont;
   fontSize: number;
   lineHeight: number;
 }) {
@@ -217,11 +222,11 @@ function drawWrappedText(params: {
 }
 
 function drawZipText(params: {
-  page: any;
+  page: PDFPage;
   zip: string;
   x: number;
   top: number;
-  font: any;
+  font: PDFFont;
   fontSize: number;
   letterSpacing: number;
 }) {
@@ -347,6 +352,63 @@ function makePreviewSrc(previewUrl: string, zoom: number) {
   return `${previewUrl}#toolbar=1&navpanes=0&scrollbar=1&zoom=${zoom}`;
 }
 
+type CountEventType = "page_view" | "click" | "pdf_download";
+
+type CountPayload = {
+  eventType: CountEventType;
+  pagePath: string;
+  action?: string;
+  sessionId?: string;
+  metadata?: Record<string, unknown>;
+};
+
+function getStoredSessionId() {
+  try {
+    const existing = sessionStorage.getItem(SESSION_ID_KEY);
+    if (existing) return existing;
+
+    const generated =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    sessionStorage.setItem(SESSION_ID_KEY, generated);
+    return generated;
+  } catch {
+    return "";
+  }
+}
+
+function getStableSessionId(handoffSessionId?: string) {
+  const fromHandoff = (handoffSessionId || "").trim();
+
+  if (fromHandoff) {
+    try {
+      sessionStorage.setItem(SESSION_ID_KEY, fromHandoff);
+    } catch {
+      //
+    }
+    return fromHandoff;
+  }
+
+  return getStoredSessionId();
+}
+
+async function postCount(payload: CountPayload) {
+  try {
+    await fetch("/api/count", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // 計測失敗はユーザー操作を止めない
+  }
+}
+
+
 export default function LetterpackPage() {
   const [form, setForm] = useState<LetterpackForm>(emptyForm);
   const [loaded, setLoaded] = useState(false);
@@ -358,6 +420,7 @@ export default function LetterpackPage() {
   const [previewUrl, setPreviewUrl] = useState("");
   const [isBuildingPdf, setIsBuildingPdf] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [sessionId, setSessionId] = useState("");
 
   const previewUrlRef = useRef("");
   const lastFetchedCompanyZipRef = useRef("");
@@ -365,6 +428,14 @@ export default function LetterpackPage() {
 
   useEffect(() => {
     try {
+      const handoffText = sessionStorage.getItem(LETTERPACK_HANDOFF_KEY);
+      const handoff = handoffText
+        ? (JSON.parse(handoffText) as Partial<LetterpackHandoff>)
+        : null;
+
+      const stableSessionId = getStableSessionId(handoff?.sessionId);
+      setSessionId(stableSessionId);
+
       const savedForm = sessionStorage.getItem(LETTERPACK_FORM_KEY);
       if (savedForm) {
         const parsed = JSON.parse(savedForm) as Partial<LetterpackForm>;
@@ -373,14 +444,12 @@ export default function LetterpackPage() {
         return;
       }
 
-      const handoffText = sessionStorage.getItem(LETTERPACK_HANDOFF_KEY);
-      if (!handoffText) {
+      if (!handoff) {
         setError("送り状ページからの引き継ぎデータが見つかりません。");
         setLoaded(true);
         return;
       }
 
-      const handoff = JSON.parse(handoffText) as Partial<LetterpackHandoff>;
       setForm(sanitizeForm(handoff));
     } catch {
       setError("引き継ぎデータの読み込みに失敗しました。");
@@ -388,6 +457,20 @@ export default function LetterpackPage() {
       setLoaded(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+
+    const countedKey = `letterpack-page-view-counted:${sessionId || getStoredSessionId()}`;
+    if (sessionStorage.getItem(countedKey)) return;
+
+    sessionStorage.setItem(countedKey, "true");
+    postCount({
+      eventType: "page_view",
+      pagePath: "/letterpack",
+      sessionId: sessionId || getStoredSessionId(),
+    });
+  }, [loaded, sessionId]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -436,10 +519,6 @@ export default function LetterpackPage() {
       }
     };
   }, []);
-
-  const recipientBlock = useMemo(() => {
-    return joinLines(form.companyName, withSama(form.recipientName));
-  }, [form.companyName, form.recipientName]);
 
   const updateField = (key: keyof LetterpackForm, value: string) => {
     setForm((prev) => {
@@ -541,6 +620,13 @@ export default function LetterpackPage() {
       a.click();
       a.remove();
 
+      postCount({
+        eventType: "pdf_download",
+        pagePath: "/letterpack",
+        action: "download_letterpack_pdf",
+        sessionId: sessionId || getStoredSessionId(),
+      });
+
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
       setError("PDFの保存に失敗しました。");
@@ -555,6 +641,13 @@ export default function LetterpackPage() {
   };
 
   const handleSkip = () => {
+    postCount({
+      eventType: "click",
+      pagePath: "/letterpack",
+      action: "go_to_life_plan",
+      sessionId: sessionId || getStoredSessionId(),
+    });
+
     window.location.href = "/life-plan";
   };
 
@@ -564,6 +657,19 @@ export default function LetterpackPage() {
 
   return (
     <main className="min-h-screen bg-slate-100">
+      <div className="w-full border-b border-amber-100 bg-[#fff7dc]">
+        <div className="mx-auto max-w-5xl px-4 py-3">
+          <Image
+            src="/images/taishoku-baasama/taishoku-tool-header-banner.png"
+            alt="退職ツール"
+            width={1024}
+            height={220}
+            priority
+            className="h-auto w-full rounded-2xl object-cover shadow-sm"
+          />
+        </div>
+      </div>
+
       <div className="mx-auto max-w-[1400px] p-4 sm:p-6">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">レターパック入力・出力</h1>

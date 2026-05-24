@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDocument, PDFFont, PDFPage, rgb } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 
 type ReturnItemsMode = "none" | "return";
@@ -30,6 +30,7 @@ type WebMailForm = {
 };
 
 type CheckoutHandoff = {
+  sessionId: string;
   companyName: string;
   companyAddress: string;
   senderName: string;
@@ -41,6 +42,8 @@ type CheckoutHandoff = {
   department: string;
   itemName: string;
   mailForm: WebMailForm;
+  coverLetterSections: string[];
+  coverLetterBody?: string;
 };
 
 type LetterpackForm = {
@@ -56,23 +59,29 @@ type LetterpackForm = {
 
 type LetterpackHandoff = Partial<LetterpackForm>;
 
+type CountEventType =
+  | "checkout_success"
+  | "pdf_download"
+  | "click";
+
+type CountPayload = {
+  eventType: CountEventType;
+  pagePath: string;
+  action?: string;
+  sessionId?: string;
+  metadata?: Record<string, unknown>;
+};
+
 const CHECKOUT_HANDOFF_KEY = "checkout-handoff-v1";
 const LETTERPACK_HANDOFF_KEY = "letterpack-handoff-v1";
 const LETTERPACK_FORM_KEY = "letterpack-form-v1";
+const SUCCESS_COUNTED_KEY = "success-counted-v1";
+const SESSION_ID_KEY = "retirement-session-id-v1";
+const COUNT_API_PATH = "/api/count";
 
-const TEMPLATE_PDF_SRC = "/letter-pack-light.pdf";
 const FONT_SRC = "/fonts/NotoSansJP-Regular.ttf";
 const DEFAULT_ITEM_NAME = "退職書類";
-
-const LETTERPACK_LAYOUT = {
-  toZip: { x: 270, top: 50, fontSize: 38, letterSpacing: 33.5 },
-  toAddress: { x: 210, top: 170, width: 230, fontSize: 15, lineHeight: 50 },
-  toName: { x: 210, top: 250, width: 230, fontSize: 13, lineHeight: 16 },
-  fromZip: { x: 210, top: 330, fontSize: 9, letterSpacing: 8 },
-  fromAddress: { x: 210, top: 350, width: 230, fontSize: 12, lineHeight: 40 },
-  fromName: { x: 210, top: 425, width: 180, fontSize: 14, lineHeight: 15 },
-  itemName: { x: 300, top: 500, width: 170, fontSize: 20, lineHeight: 15 },
-} as const;
+const HEADER_BANNER_SRC = "/images/taishoku-baasama/taishoku-tool-header-banner.png";
 
 const emptyLetterpackForm: LetterpackForm = {
   companyName: "",
@@ -89,16 +98,6 @@ function normalizeZip(value: string) {
   const digits = (value || "").replace(/\D/g, "").slice(0, 7);
   if (digits.length <= 3) return digits;
   return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-}
-
-function displayZip(value: string) {
-  return (value || "").replace(/\D/g, "").slice(0, 7);
-}
-
-function withSama(value: string) {
-  const trimmed = (value || "").trim();
-  if (!trimmed) return "ご担当者様";
-  return trimmed.replace(/様+$/, "") + " 様";
 }
 
 function withSingleSama(value: string) {
@@ -136,79 +135,7 @@ function sanitizeLetterpackForm(input?: Partial<LetterpackForm> | Partial<Letter
   };
 }
 
-function buildRequestedDocsBlock(baseDocs: string[], extraDocs: string[]) {
-  const lines: string[] = [];
-  if (baseDocs.length > 0) lines.push(baseDocs.join("・"));
-  if (extraDocs.length > 0) lines.push(extraDocs.join("・"));
-  return lines.join("\n");
-}
-
-function buildCoverLetterSections(handoff: CheckoutHandoff) {
-  const form = handoff.mailForm;
-  const sections: string[] = [];
-
-  const requestedDocsBase = ["源泉徴収票", "最後の給与明細", "離職票"];
-  const requestedDocsExtra: string[] = [];
-
-  if (form.depositDocsMode === "has") {
-    if (form.pensionDocType === "pension_book") requestedDocsExtra.push("年金手帳");
-    if (form.pensionDocType === "basic_notice") requestedDocsExtra.push("基礎年金番号通知書");
-    if (form.depositEmploymentInsurance) requestedDocsExtra.push("雇用保険被保険者証");
-    if (form.depositMyNumberCard) requestedDocsExtra.push("マイナンバーカード");
-  }
-
-  const residentTaxText =
-    form.residentTaxType === "collect"
-      ? "住民税は一括徴収でお願いいたします。"
-      : form.residentTaxType === "self"
-      ? "住民税は普通徴収に切り替えていただけますと幸いです。"
-      : "";
-
-  sections.push("拝啓");
-
-  const openingLines = [
-    "お世話になっております。",
-    "退職に伴う書類を送付いたします。",
-  ];
-
-  if (form.healthConditionNote) {
-    openingLines.push(
-      "なお、体調不良により勤務継続が困難な状況です。\n以後のご連絡は書面または郵送にてお願いいたします。"
-    );
-  }
-
-  sections.push(openingLines.join("\n"));
-
-  if (form.belongingsMode === "request") {
-    sections.push(
-      `お手数をおかけしますが、私物は着払いにて送付をお願いいたします。${
-        form.belongingsNote ? `\n私物内容：${form.belongingsNote}` : ""
-      }`
-    );
-  }
-
-  if (form.returnItemsMode === "return") {
-    sections.push(
-      `貸与頂いていましたものをお返しいたします。${
-        form.returnItemsNote ? `\n返却物：${form.returnItemsNote}` : ""
-      }`
-    );
-  }
-
-  if (residentTaxText) sections.push(residentTaxText);
-
-  sections.push(
-    `${buildRequestedDocsBlock(
-      requestedDocsBase,
-      requestedDocsExtra
-    )}\nにつきましては、こちらの書類の送り元住所へお送りください。`
-  );
-
-  sections.push("ご確認のほど、よろしくお願いいたします。");
-  return sections;
-}
-
-function wrapText(text: string, maxWidth: number, font: any, fontSize: number): string[] {
+function wrapText(text: string, maxWidth: number, font: PDFFont, fontSize: number): string[] {
   const lines: string[] = [];
   const paragraphs = (text || "").replace(/\r\n/g, "\n").split("\n");
 
@@ -243,12 +170,12 @@ function wrapText(text: string, maxWidth: number, font: any, fontSize: number): 
 }
 
 function drawWrappedText(params: {
-  page: any;
+  page: PDFPage;
   text: string;
   x: number;
   top: number;
   width: number;
-  font: any;
+  font: PDFFont;
   fontSize: number;
   lineHeight: number;
 }) {
@@ -267,33 +194,47 @@ function drawWrappedText(params: {
   });
 }
 
-function topToPdfY(pageHeight: number, top: number, fontSize: number) {
-  return pageHeight - top - fontSize;
+function getStableSessionId(handoff?: CheckoutHandoff | null) {
+  const handoffSessionId = handoff?.sessionId?.trim();
+
+  if (handoffSessionId) {
+    try {
+      localStorage.setItem(SESSION_ID_KEY, handoffSessionId);
+    } catch {
+      // localStorageへ保存できなくても、handoff側のIDを優先する
+    }
+
+    return handoffSessionId;
+  }
+
+  try {
+    const existing = localStorage.getItem(SESSION_ID_KEY);
+    if (existing) return existing;
+
+    const created =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    localStorage.setItem(SESSION_ID_KEY, created);
+    return created;
+  } catch {
+    return "";
+  }
 }
 
-function drawZipText(params: {
-  page: any;
-  zip: string;
-  x: number;
-  top: number;
-  font: any;
-  fontSize: number;
-  letterSpacing: number;
-}) {
-  const { page, zip, x, top, font, fontSize, letterSpacing } = params;
-  const digits = displayZip(zip);
-  const pageHeight = page.getHeight();
-  const y = topToPdfY(pageHeight, top, fontSize);
-
-  Array.from(digits).forEach((ch, index) => {
-    page.drawText(ch, {
-      x: x + index * letterSpacing,
-      y,
-      size: fontSize,
-      font,
-      color: rgb(0, 0, 0),
+async function postCount(payload: CountPayload) {
+  try {
+    await fetch(COUNT_API_PATH, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
-  });
+  } catch {
+    // 計測失敗はユーザー操作を止めない
+  }
 }
 
 async function fetchArrayBufferStrict(src: string) {
@@ -360,7 +301,14 @@ async function buildCoverLetterPdf(handoff: CheckoutHandoff): Promise<Uint8Array
     lineHeight: 28,
   });
 
-  const sections = buildCoverLetterSections(handoff);
+  const sections = Array.isArray(handoff.coverLetterSections)
+    ? handoff.coverLetterSections.filter((section) => section.trim())
+    : [];
+
+  if (!sections.length) {
+    throw new Error("coverLetterSections is missing.");
+  }
+
   let currentTop = mm(106);
 
   for (const section of sections) {
@@ -389,100 +337,6 @@ async function buildCoverLetterPdf(handoff: CheckoutHandoff): Promise<Uint8Array
   return pdfDoc.save();
 }
 
-async function buildLetterpackPdf(formInput: LetterpackForm): Promise<Uint8Array> {
-  const form = sanitizeLetterpackForm(formInput);
-
-  const [templateBytes, fontBytes] = await Promise.all([
-    fetchArrayBufferStrict(TEMPLATE_PDF_SRC),
-    fetchArrayBufferStrict(FONT_SRC),
-  ]);
-
-  const pdfDoc = await PDFDocument.load(templateBytes);
-  pdfDoc.registerFontkit(fontkit);
-
-  const font = await pdfDoc.embedFont(fontBytes, { subset: false });
-  const page = pdfDoc.getPages()[0];
-
-  const recipientBlock = joinLines(form.companyName, withSama(form.recipientName));
-
-  drawZipText({
-    page,
-    zip: form.companyZip,
-    x: LETTERPACK_LAYOUT.toZip.x,
-    top: LETTERPACK_LAYOUT.toZip.top,
-    font,
-    fontSize: LETTERPACK_LAYOUT.toZip.fontSize,
-    letterSpacing: LETTERPACK_LAYOUT.toZip.letterSpacing,
-  });
-
-  drawWrappedText({
-    page,
-    text: form.companyAddress,
-    x: LETTERPACK_LAYOUT.toAddress.x,
-    top: LETTERPACK_LAYOUT.toAddress.top,
-    width: LETTERPACK_LAYOUT.toAddress.width,
-    font,
-    fontSize: LETTERPACK_LAYOUT.toAddress.fontSize,
-    lineHeight: LETTERPACK_LAYOUT.toAddress.lineHeight,
-  });
-
-  drawWrappedText({
-    page,
-    text: recipientBlock,
-    x: LETTERPACK_LAYOUT.toName.x,
-    top: LETTERPACK_LAYOUT.toName.top,
-    width: LETTERPACK_LAYOUT.toName.width,
-    font,
-    fontSize: LETTERPACK_LAYOUT.toName.fontSize,
-    lineHeight: LETTERPACK_LAYOUT.toName.lineHeight,
-  });
-
-  drawZipText({
-    page,
-    zip: form.senderZip,
-    x: LETTERPACK_LAYOUT.fromZip.x,
-    top: LETTERPACK_LAYOUT.fromZip.top,
-    font,
-    fontSize: LETTERPACK_LAYOUT.fromZip.fontSize,
-    letterSpacing: LETTERPACK_LAYOUT.fromZip.letterSpacing,
-  });
-
-  drawWrappedText({
-    page,
-    text: form.senderAddress,
-    x: LETTERPACK_LAYOUT.fromAddress.x,
-    top: LETTERPACK_LAYOUT.fromAddress.top,
-    width: LETTERPACK_LAYOUT.fromAddress.width,
-    font,
-    fontSize: LETTERPACK_LAYOUT.fromAddress.fontSize,
-    lineHeight: LETTERPACK_LAYOUT.fromAddress.lineHeight,
-  });
-
-  drawWrappedText({
-    page,
-    text: form.senderName,
-    x: LETTERPACK_LAYOUT.fromName.x,
-    top: LETTERPACK_LAYOUT.fromName.top,
-    width: LETTERPACK_LAYOUT.fromName.width,
-    font,
-    fontSize: LETTERPACK_LAYOUT.fromName.fontSize,
-    lineHeight: LETTERPACK_LAYOUT.fromName.lineHeight,
-  });
-
-  drawWrappedText({
-    page,
-    text: sanitizeItemName(form.itemName),
-    x: LETTERPACK_LAYOUT.itemName.x,
-    top: LETTERPACK_LAYOUT.itemName.top,
-    width: LETTERPACK_LAYOUT.itemName.width,
-    font,
-    fontSize: LETTERPACK_LAYOUT.itemName.fontSize,
-    lineHeight: LETTERPACK_LAYOUT.itemName.lineHeight,
-  });
-
-  return pdfDoc.save();
-}
-
 function downloadBytes(bytes: Uint8Array, filename: string) {
   const safeBytes = Uint8Array.from(bytes);
   const blob = new Blob([safeBytes], { type: "application/pdf" });
@@ -501,7 +355,18 @@ function downloadBytes(bytes: Uint8Array, filename: string) {
 function readCheckoutHandoff(): CheckoutHandoff | null {
   const raw = sessionStorage.getItem(CHECKOUT_HANDOFF_KEY);
   if (!raw) return null;
-  return JSON.parse(raw) as CheckoutHandoff;
+
+  const parsed = JSON.parse(raw) as CheckoutHandoff;
+
+  if (!parsed.sessionId?.trim()) {
+    return null;
+  }
+
+  if (!Array.isArray(parsed.coverLetterSections) || parsed.coverLetterSections.length === 0) {
+    return null;
+  }
+
+  return parsed;
 }
 
 function readLetterpackForm(checkout: CheckoutHandoff | null): LetterpackForm | null {
@@ -524,10 +389,25 @@ function readLetterpackForm(checkout: CheckoutHandoff | null): LetterpackForm | 
   });
 }
 
+function HeaderBanner() {
+  return (
+    <div className="w-full border-b border-amber-100 bg-[#fff7dc]">
+      <div className="mx-auto max-w-5xl px-4 py-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={HEADER_BANNER_SRC}
+          alt="退職ツール"
+          className="h-auto w-full rounded-2xl object-cover shadow-sm"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function SuccessPage() {
   const [isPaid, setIsPaid] = useState(false);
   const [checkout, setCheckout] = useState<CheckoutHandoff | null>(null);
-  const [letterpackForm, setLetterpackForm] = useState<LetterpackForm>(emptyLetterpackForm);
+  const [, setLetterpackForm] = useState<LetterpackForm>(emptyLetterpackForm);
   const [error, setError] = useState("");
   const [isBuildingCoverLetter, setIsBuildingCoverLetter] = useState(false);
 
@@ -547,7 +427,7 @@ export default function SuccessPage() {
 
       const loadedCheckout = readCheckoutHandoff();
       if (!loadedCheckout) {
-        setError("送り状データが見つかりません。郵送補助ページからやり直してください。");
+        setError("送り状本文データが見つかりません。郵送補助ページからやり直してください。");
         return;
       }
 
@@ -559,6 +439,21 @@ export default function SuccessPage() {
 
       setCheckout(loadedCheckout);
       setLetterpackForm(loadedLetterpack);
+
+      const countedKey = `${SUCCESS_COUNTED_KEY}:${getStableSessionId(loadedCheckout)}`;
+      if (!sessionStorage.getItem(countedKey)) {
+        sessionStorage.setItem(countedKey, "true");
+        postCount({
+          eventType: "checkout_success",
+          pagePath: "/success",
+          sessionId: getStableSessionId(loadedCheckout),
+          metadata: {
+            paid: paidByUrl,
+            paidByStorage,
+            search: window.location.search,
+          },
+        });
+      }
     } catch {
       setError("保存データの読み込みに失敗しました。");
     }
@@ -573,6 +468,13 @@ export default function SuccessPage() {
 
       const pdfBytes = await buildCoverLetterPdf(checkout);
       downloadBytes(pdfBytes, "cover-letter.pdf");
+
+      postCount({
+        eventType: "pdf_download",
+        pagePath: "/success",
+        action: "download_cover_letter",
+        sessionId: getStableSessionId(checkout),
+      });
     } catch {
       setError("送り状PDFの保存に失敗しました。");
     } finally {
@@ -582,69 +484,80 @@ export default function SuccessPage() {
 
   if (!isPaid) {
     return (
-      <main className="min-h-screen bg-slate-50 px-4 py-10">
-        <div className="mx-auto max-w-2xl rounded-2xl bg-white p-6 shadow">
-          <h1 className="text-xl font-bold text-slate-900">決済情報を確認できません</h1>
-          <p className="mt-3 text-sm text-slate-600">郵送補助ページからやり直してください。</p>
-          <button
-            type="button"
-            onClick={() => {
-              window.location.href = "/web-mail";
-            }}
-            className="mt-6 w-full rounded-xl bg-slate-900 px-6 py-4 text-base font-bold text-white"
-          >
-            郵送補助ページへ戻る
-          </button>
+      <main className="min-h-screen bg-slate-50">
+        <HeaderBanner />
+
+        <div className="mx-auto max-w-2xl px-4 py-10">
+          <div className="rounded-2xl bg-white p-6 shadow">
+            <h1 className="text-xl font-bold text-slate-900">決済情報を確認できません</h1>
+            <p className="mt-3 text-sm text-slate-600">郵送補助ページからやり直してください。</p>
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/web-mail";
+              }}
+              className="mt-6 w-full rounded-xl bg-slate-900 px-6 py-4 text-base font-bold text-white"
+            >
+              郵送補助ページへ戻る
+            </button>
+          </div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-10">
-      <div className="mx-auto max-w-2xl rounded-2xl bg-white p-6 shadow">
-        <h1 className="text-2xl font-bold text-slate-900">PDF出力の準備が完了しました</h1>
+    <main className="min-h-screen bg-slate-50">
+      <HeaderBanner />
 
-        <p className="mt-4 text-sm text-slate-700">
-          送り状PDFをダウンロードできます。必要な場合はレターパック宛名PDFも出力してください。
-        </p>
+      <div className="mx-auto max-w-2xl px-4 py-10">
+        <div className="rounded-2xl bg-white p-6 shadow">
+          <h1 className="text-2xl font-bold text-slate-900">PDF出力の準備が完了しました</h1>
 
-        {error ? (
-          <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        ) : null}
+          <p className="mt-4 text-sm text-slate-700">
+            送り状PDFをダウンロードできます。必要な場合はレターパック宛名PDFも出力してください。
+          </p>
 
-        <button
-          type="button"
-          onClick={handleDownloadCoverLetter}
-          disabled={isBuildingCoverLetter || !!error || !checkout}
-          className="mt-6 w-full rounded-xl bg-green-600 px-6 py-4 text-base font-bold text-white hover:bg-green-700 disabled:bg-gray-300"
-        >
-          {isBuildingCoverLetter ? "送り状PDFを作成中..." : "送り状PDFをダウンロードする"}
-        </button>
+          {error ? (
+            <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-700">
+              {error}
+            </div>
+          ) : null}
 
-        <button
-          type="button"
-          onClick={() => {
-            window.location.href = "/letterpack";
-          }}
-          disabled={!!error}
-          className="mt-4 w-full rounded-xl border border-slate-300 bg-white px-6 py-4 text-base font-bold text-slate-700 disabled:bg-gray-100 disabled:text-slate-400"
-        >
-          送り状ダウンロード後、次へ進む
-        </button>
+          <button
+            type="button"
+            onClick={handleDownloadCoverLetter}
+            disabled={isBuildingCoverLetter || !!error || !checkout}
+            className="mt-6 w-full rounded-xl bg-green-600 px-6 py-4 text-base font-bold text-white hover:bg-green-700 disabled:bg-gray-300"
+          >
+            {isBuildingCoverLetter ? "送り状PDFを作成中..." : "送り状PDFをダウンロードする"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              postCount({
+                eventType: "click",
+                pagePath: "/success",
+                action: "go_to_letterpack",
+                sessionId: getStableSessionId(checkout),
+              });
+              window.location.href = "/letterpack";
+            }}
+            disabled={!!error}
+            className="mt-4 w-full rounded-xl border border-slate-300 bg-white px-6 py-4 text-base font-bold text-slate-700 disabled:bg-gray-100 disabled:text-slate-400"
+          >
+            送り状ダウンロード後、次へ進む
+          </button>
 
           <div className="mt-4 rounded-xl border border-red-300 bg-red-50 p-4 text-sm font-bold text-red-700">
-             ※必ずPDFをダウンロードしてください。ダウンロードしないままページを離れると、データを再取得できない場合があります。
+            ※必ずPDFをダウンロードしてください。ダウンロードしないままページを離れると、データを再取得できない場合があります。
           </div>
 
-
-
-
-        <p className="mt-4 text-xs leading-6 text-slate-500">
-          ※相手が受け取ったことが記録されるレターパックでの郵送方法を推奨いたします。
-        </p>
+          <p className="mt-4 text-xs leading-6 text-slate-500">
+            ※相手が受け取ったことが記録されるレターパックでの郵送方法を推奨いたします。
+          </p>
+        </div>
       </div>
     </main>
   );

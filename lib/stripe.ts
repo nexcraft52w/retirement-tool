@@ -1,7 +1,11 @@
 import Stripe from "stripe";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  console.warn("STRIPE_SECRET_KEY is not set.");
-}
+export function getStripeClient() {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "dummy_key");
+  if (!secretKey) {
+    throw new Error("STRIPE_SECRET_KEY is not set.");
+  }
+
+  return new Stripe(secretKey);
+}

@@ -46,6 +46,7 @@ type WebMailForm = {
 
 type WebMailSavedState = {
   version: 2;
+  sessionId: string;
   form: WebMailForm;
   companyName: string;
   companyAddress: string;
@@ -53,6 +54,8 @@ type WebMailSavedState = {
   basePrice: number;
   discountAmount: number;
   finalPrice: number;
+  coverLetterSections?: string[];
+  coverLetterBody?: string;
   updatedAt: string;
 };
 
@@ -136,6 +139,7 @@ type PreviewData = {
 };
 
 type NextPageAddressHandoff = {
+  sessionId: string;
   companyName: string;
   senderName: string;
   senderZip: string;
@@ -147,6 +151,7 @@ type NextPageAddressHandoff = {
 };
 
 type LetterpackHandoff = {
+  sessionId: string;
   companyName: string;
   recipientName: string;
   companyAddress: string;
@@ -159,6 +164,7 @@ type LetterpackHandoff = {
 };
 
 type CheckoutHandoff = {
+  sessionId: string;
   companyName: string;
   companyAddress: string;
   senderName: string;
@@ -173,6 +179,8 @@ type CheckoutHandoff = {
   discountAmount: number;
   finalPrice: number;
   mailForm: WebMailForm;
+  coverLetterSections: string[];
+  coverLetterBody: string;
   updatedAt: string;
 };
 
@@ -192,10 +200,28 @@ const LETTERPACK_HANDOFF_KEY = "letterpack-handoff-v1";
 const CHECKOUT_HANDOFF_KEY = "checkout-handoff-v1";
 const SESSION_ID_KEY = "retirement-session-id-v1";
 
-const WEB_MAIL_BASE_PRICE = 1500;
-
-const FREE_CAMPAIGN = true;
-const FREE_CAMPAIGN_LABEL = "今だけ無料公開中";
+const WEB_MAIL_CONFIG = {
+  basePrice: 1500,
+  freeCampaign: true,
+  freeCampaignLabel: "今だけ無料公開中",
+  paths: {
+    countApi: "/api/count",
+    zipcodeApi: "/api/zipcode",
+    checkout: "/checkout",
+    nextStepResidentTax: "/next-step#resident-tax",
+    residentTaxGuide: "https://guide.taishoku-tool.com/taishoku-juuminzei",
+    retirementTop: "/",
+  },
+  images: {
+    hero: "/images/taishoku-baasama/taishoku-baasama-half-guide.png",
+    gassho: "/images/taishoku-baasama/taishoku-baasama-half-gassho.png",
+    guide: "/images/taishoku-baasama/taishoku-baasama-half-guide.png",
+    point: "/images/taishoku-baasama/taishoku-baasama-half-point.png",
+    think: "/images/taishoku-baasama/taishoku-baasama-half-think.png",
+    thumbsUp: "/images/taishoku-baasama/taishoku-baasama-half-thumbsup.png",
+    headerBanner: "/images/taishoku-baasama/taishoku-tool-header-banner.png",
+  },
+} as const;
 
 const emptyForm: WebMailForm = {
   department: "",
@@ -219,7 +245,7 @@ const emptyForm: WebMailForm = {
   belongingsNote: "",
 
   residentTaxType: "none",
-  healthConditionNote: false,
+  healthConditionNote: true,
 };
 
 const normalizeZip = (value: string) => {
@@ -254,6 +280,83 @@ const getSessionId = () => {
     return "";
   }
 };
+type CountEventType =
+  | "page_view"
+  | "click"
+  | "pdf_download"
+  | "postal_start"
+  | "checkout_start"
+  | "checkout_success";
+
+type CountPayload = {
+  eventType: CountEventType;
+  pagePath: string;
+  action?: string;
+  sessionId?: string;
+  metadata?: Record<string, unknown>;
+};
+
+async function postCount(payload: CountPayload) {
+  try {
+    await fetch(WEB_MAIL_CONFIG.paths.countApi, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // 計測失敗はユーザー操作を止めない
+  }
+}
+
+async function lookupZipcode(zip: string) {
+  const digits = zip.replace(/\D/g, "");
+  if (digits.length !== 7) return { address: "", error: "" };
+
+  try {
+    const res = await fetch(
+      `${WEB_MAIL_CONFIG.paths.zipcodeApi}?zipcode=${digits}&zip=${digits}`
+    );
+    const data = await res.json();
+
+    if (!res.ok) {
+      return {
+        address: "",
+        error: "住所検索に失敗しました。郵便番号APIを確認してください。",
+      };
+    }
+
+    let address = "";
+
+    if (typeof data.address === "string") {
+      address = data.address;
+    }
+
+    if (!address) {
+      address = `${data.prefecture ?? ""}${data.city ?? ""}${data.town ?? ""}`;
+    }
+
+    if (!address && Array.isArray(data.results) && data.results[0]) {
+      const r = data.results[0];
+      address = `${r.address1 ?? ""}${r.address2 ?? ""}${r.address3 ?? ""}`;
+    }
+
+    if (!address.trim()) {
+      return {
+        address: "",
+        error: "郵便番号から住所を取得できませんでした。",
+      };
+    }
+
+    return { address, error: "" };
+  } catch {
+    return {
+      address: "",
+      error: "住所検索で通信エラーが発生しました。",
+    };
+  }
+}
 
 function buildRequestedDocsBlock(baseDocs: string[], extraDocs: string[]) {
   const lines: string[] = [];
@@ -277,7 +380,7 @@ function buildLetterBodySections(preview: PreviewData) {
   sections.push(
     `お世話になっております。\n退職に伴う書類を送付いたします。${
       preview.healthConditionNote
-        ? "\nなお、体調不良により勤務継続が困難な状況です。\n以後のご連絡は書面または郵送にてお願いいたします。"
+        ? "\nなお、体調不良により勤務継続、電話応対が困難な状況です。\n以後のご連絡は書面または郵送にてお願いいたします。"
         : ""
     }`
   );
@@ -322,7 +425,7 @@ function resolvePricingFromHandoffs(
     const basePrice =
       typeof episodeHandoff.discount.basePrice === "number"
         ? episodeHandoff.discount.basePrice
-        : WEB_MAIL_BASE_PRICE;
+        : WEB_MAIL_CONFIG.basePrice;
 
     const finalPrice =
       typeof episodeHandoff.discount.finalPrice === "number"
@@ -346,7 +449,7 @@ function resolvePricingFromHandoffs(
     const basePrice =
       typeof retirementHandoff.basePrice === "number"
         ? retirementHandoff.basePrice
-        : WEB_MAIL_BASE_PRICE;
+        : WEB_MAIL_CONFIG.basePrice;
 
     const finalPrice =
       typeof retirementHandoff.finalPrice === "number"
@@ -372,9 +475,9 @@ function resolvePricingFromHandoffs(
 
   return {
     source: "default",
-    basePrice: WEB_MAIL_BASE_PRICE,
+    basePrice: WEB_MAIL_CONFIG.basePrice,
     discountAmount: 0,
-    finalPrice: WEB_MAIL_BASE_PRICE,
+    finalPrice: WEB_MAIL_CONFIG.basePrice,
   };
 }
 
@@ -383,29 +486,12 @@ export default function WebMailPage() {
   const [companyName, setCompanyName] = useState("");
   const [companyAddress, setCompanyAddress] = useState("");
   const [senderName, setSenderName] = useState("");
-  const [basePrice, setBasePrice] = useState(WEB_MAIL_BASE_PRICE);
-  const [discountAmount, setDiscountAmount] = useState(0);
-  const [finalPrice, setFinalPrice] = useState(WEB_MAIL_BASE_PRICE);
+  const [basePrice, setBasePrice] = useState<number>(WEB_MAIL_CONFIG.basePrice);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [finalPrice, setFinalPrice] = useState<number>(WEB_MAIL_CONFIG.basePrice);
   const [zipcodeError, setZipcodeError] = useState("");
   const [isRestored, setIsRestored] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-
-  const sendCount = async (type: "view" | "pdf" | "postal") => {
-    try {
-      await fetch("/api/count", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type,
-          sessionId: getSessionId(),
-        }),
-      });
-    } catch {
-      //
-    }
-  };
 
   useEffect(() => {
     try {
@@ -513,7 +599,7 @@ export default function WebMailPage() {
         ...nextForm,
         itemName: nextForm.itemName ?? "書類",
         pensionDocType: nextForm.pensionDocType ?? "none",
-        healthConditionNote: nextForm.healthConditionNote ?? false,
+        healthConditionNote: nextForm.healthConditionNote ?? true,
       });
 
       setCompanyName(nextCompanyName);
@@ -528,19 +614,23 @@ export default function WebMailPage() {
       setCompanyName("");
       setCompanyAddress("");
       setSenderName("");
-      setBasePrice(WEB_MAIL_BASE_PRICE);
+      setBasePrice(WEB_MAIL_CONFIG.basePrice);
       setDiscountAmount(0);
-      setFinalPrice(WEB_MAIL_BASE_PRICE);
+      setFinalPrice(WEB_MAIL_CONFIG.basePrice);
       setIsRestored(true);
     }
   }, []);
 
   useEffect(() => {
-    sendCount("view");
+    postCount({
+      eventType: "page_view",
+      pagePath: "/web-mail",
+      sessionId: getSessionId(),
+    });
   }, []);
 
-  const displayFinalPrice = FREE_CAMPAIGN ? 0 : finalPrice;
-  const displayDiscountAmount = FREE_CAMPAIGN
+  const displayFinalPrice = WEB_MAIL_CONFIG.freeCampaign ? 0 : finalPrice;
+  const displayDiscountAmount = WEB_MAIL_CONFIG.freeCampaign
     ? basePrice
     : Math.max(0, discountAmount);
 
@@ -550,11 +640,12 @@ export default function WebMailPage() {
       ...targetForm,
       itemName: targetForm.itemName || "書類",
       pensionDocType: targetForm.pensionDocType || "none",
-      healthConditionNote: targetForm.healthConditionNote ?? false,
+      healthConditionNote: targetForm.healthConditionNote ?? true,
     };
 
     const payload: WebMailSavedState = {
       version: 2,
+      sessionId: getSessionId(),
       form: normalizedForm,
       companyName,
       companyAddress,
@@ -562,6 +653,8 @@ export default function WebMailPage() {
       basePrice,
       discountAmount,
       finalPrice: displayFinalPrice,
+      coverLetterSections: bodySections,
+      coverLetterBody: bodySections.join("\n\n"),
       updatedAt: new Date().toISOString(),
     };
 
@@ -583,51 +676,25 @@ export default function WebMailPage() {
   ]);
 
   const fetchAddress = async (zip: string) => {
-    const digits = zip.replace(/\D/g, "");
-    if (digits.length !== 7) return;
+    const result = await lookupZipcode(zip);
 
-    try {
-      setZipcodeError("");
-
-      const res = await fetch(`/api/zipcode?zipcode=${digits}&zip=${digits}`);
-      const data = await res.json();
-
-      if (!res.ok) {
-        setZipcodeError("住所検索に失敗しました。/api/zipcode を確認してください。");
-        return;
-      }
-
-      let address = "";
-
-      if (typeof data.address === "string") {
-        address = data.address;
-      }
-
-      if (!address) {
-        address = `${data.prefecture ?? ""}${data.city ?? ""}${data.town ?? ""}`;
-      }
-
-      if (!address && Array.isArray(data.results) && data.results[0]) {
-        const r = data.results[0];
-        address = `${r.address1 ?? ""}${r.address2 ?? ""}${r.address3 ?? ""}`;
-      }
-
-      if (!address.trim()) {
-        setZipcodeError("郵便番号から住所を取得できませんでした。");
-        return;
-      }
-
-      setForm((prev) => {
-        const next: WebMailForm = {
-          ...prev,
-          senderAddress1: address,
-        };
-        saveWebMailState(next);
-        return next;
-      });
-    } catch {
-      setZipcodeError("住所検索で通信エラーが発生しました。");
+    if (result.error) {
+      setZipcodeError(result.error);
+      return;
     }
+
+    if (!result.address) return;
+
+    setZipcodeError("");
+
+    setForm((prev) => {
+      const next: WebMailForm = {
+        ...prev,
+        senderAddress1: result.address,
+      };
+      saveWebMailState(next);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -726,7 +793,7 @@ export default function WebMailPage() {
 
       const returnPricingHandoff: RetirementDirectHandoff = {
         sourcePage: "web-mail",
-        returnPath: "/",
+        returnPath: WEB_MAIL_CONFIG.paths.retirementTop,
         companyName:
           preview.companyName === "未入力"
             ? mergedRetirementForm.companyName
@@ -761,70 +828,113 @@ export default function WebMailPage() {
   };
 
   const saveHandoffData = () => {
-    saveWebMailState();
+    try {
+      const sessionId = getSessionId();
 
-    const nextPageHandoff: NextPageAddressHandoff = {
-      companyName: preview.companyName,
-      senderName: preview.senderName,
-      senderZip: preview.senderZip,
-      senderAddress1: preview.senderAddress1,
-      senderAddress2: preview.senderAddress2,
-      recipientName: preview.recipientName,
-      department: preview.department,
-      itemName: preview.itemName,
-    };
+      if (!sessionId) {
+        throw new Error("sessionId could not be created.");
+      }
 
-    const letterpackHandoff: LetterpackHandoff = {
-      companyName: preview.companyName,
-      recipientName: preview.recipientName,
-      companyAddress,
+      saveWebMailState();
 
-      senderName: preview.senderName,
-      senderZip: preview.senderZip,
-      senderAddress: joinAddress(preview.senderAddress1, preview.senderAddress2),
-
-      itemName: preview.itemName,
-    };
-
-    const checkoutHandoff: CheckoutHandoff = {
-      companyName: preview.companyName,
-      companyAddress,
-      senderName: preview.senderName,
-      senderZip: preview.senderZip,
-      senderAddress1: preview.senderAddress1,
-      senderAddress2: preview.senderAddress2,
-      senderAddress: joinAddress(preview.senderAddress1, preview.senderAddress2),
-      recipientName: preview.recipientName,
-      department: preview.department,
-      itemName: preview.itemName,
-      basePrice: preview.basePrice,
-      discountAmount: preview.discountAmount,
-      finalPrice: preview.finalPrice,
-      mailForm: {
+      const normalizedMailForm: WebMailForm = {
         ...emptyForm,
         ...form,
         itemName: preview.itemName,
-      },
-      updatedAt: new Date().toISOString(),
-    };
+        healthConditionNote: form.healthConditionNote ?? true,
+      };
 
-    sessionStorage.setItem(
-      WEB_MAIL_NEXT_HANDOFF_KEY,
-      JSON.stringify(nextPageHandoff)
-    );
-    sessionStorage.setItem(
-      LETTERPACK_HANDOFF_KEY,
-      JSON.stringify(letterpackHandoff)
-    );
-    sessionStorage.setItem(
-      CHECKOUT_HANDOFF_KEY,
-      JSON.stringify(checkoutHandoff)
-    );
+      const senderAddress = joinAddress(
+        preview.senderAddress1,
+        preview.senderAddress2
+      );
+
+      const nextPageHandoff: NextPageAddressHandoff = {
+        sessionId,
+        companyName: preview.companyName,
+        senderName: preview.senderName,
+        senderZip: preview.senderZip,
+        senderAddress1: preview.senderAddress1,
+        senderAddress2: preview.senderAddress2,
+        recipientName: preview.recipientName,
+        department: preview.department,
+        itemName: preview.itemName,
+      };
+
+      const letterpackHandoff: LetterpackHandoff = {
+        sessionId,
+        companyName: preview.companyName,
+        recipientName: preview.recipientName,
+        companyAddress,
+
+        senderName: preview.senderName,
+        senderZip: preview.senderZip,
+        senderAddress,
+
+        itemName: preview.itemName,
+      };
+
+      const checkoutHandoff: CheckoutHandoff = {
+        sessionId,
+        companyName: preview.companyName,
+        companyAddress,
+        senderName: preview.senderName,
+        senderZip: preview.senderZip,
+        senderAddress1: preview.senderAddress1,
+        senderAddress2: preview.senderAddress2,
+        senderAddress,
+        recipientName: preview.recipientName,
+        department: preview.department,
+        itemName: preview.itemName,
+        basePrice: preview.basePrice,
+        discountAmount: preview.discountAmount,
+        finalPrice: preview.finalPrice,
+        mailForm: normalizedMailForm,
+        coverLetterSections: bodySections,
+        coverLetterBody: bodySections.join("\n\n"),
+        updatedAt: new Date().toISOString(),
+      };
+
+      sessionStorage.setItem(
+        WEB_MAIL_NEXT_HANDOFF_KEY,
+        JSON.stringify(nextPageHandoff)
+      );
+      sessionStorage.setItem(
+        LETTERPACK_HANDOFF_KEY,
+        JSON.stringify(letterpackHandoff)
+      );
+      sessionStorage.setItem(
+        CHECKOUT_HANDOFF_KEY,
+        JSON.stringify(checkoutHandoff)
+      );
+
+      const savedRaw = sessionStorage.getItem(CHECKOUT_HANDOFF_KEY);
+      if (!savedRaw) {
+        throw new Error("checkout handoff was not saved.");
+      }
+
+      const saved = JSON.parse(savedRaw) as Partial<CheckoutHandoff>;
+      if (
+        saved.sessionId !== sessionId ||
+        !Array.isArray(saved.coverLetterSections) ||
+        saved.coverLetterSections.length === 0 ||
+        typeof saved.coverLetterBody !== "string" ||
+        saved.coverLetterBody.trim().length === 0
+      ) {
+        throw new Error("checkout handoff validation failed.");
+      }
+
+      return true;
+    } catch (error) {
+      console.error("[web-mail handoff save error]", error);
+      return false;
+    }
   };
 
   useEffect(() => {
+    if (!isRestored) return;
     saveHandoffData();
-  }, [preview, companyAddress]);
+  }, [isRestored, preview, companyAddress]);
 
   const handleChange =
     (key: keyof WebMailForm) =>
@@ -847,28 +957,57 @@ export default function WebMailPage() {
       });
     };
 
-  const canGenerate =
-    !!form.senderAddress1 && !!form.recipientName && !!preview.itemName;
+  const canGenerate = !!form.senderAddress1 && !!preview.itemName;
 
   return (
-    <main className="min-h-screen bg-slate-50 p-4">
+    <main className="min-h-screen bg-[#f5f8fb] p-4 text-slate-900">
       <div className="mx-auto max-w-[1450px]">
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,620px)_minmax(0,1fr)]">
-          <section className="rounded-3xl border bg-white p-6">
-            <h1 className="mb-6 text-2xl font-bold">入力・確認</h1>
+        <div className="mb-6 overflow-hidden rounded-[28px] border border-sky-100 bg-white shadow-sm">
+          <img
+            src={WEB_MAIL_CONFIG.images.headerBanner}
+            alt="退職ツール 郵送補助"
+            className="block h-auto w-full"
+          />
+        </div>
 
-            <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+        <section className="mb-6 overflow-hidden rounded-[28px] border border-sky-100 bg-gradient-to-br from-amber-50 via-white to-sky-50 p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <div className="mb-3 inline-flex rounded-full bg-[#082f5f] px-3 py-1 text-xs font-bold text-white">
+                退職ツール 郵送補助
+              </div>
+              <h1 className="text-2xl font-black leading-tight text-[#082f5f] sm:text-3xl">
+                退職時のやり取りを、先に整理して郵送文面にまとめます。
+              </h1>
+              <p className="mt-4 max-w-3xl text-sm leading-7 text-slate-700">
+                退職ばあ様が、返却物・私物・住民税・会社から返してもらう書類を確認しながら案内します。
+              </p>
+            </div>
+
+            <img
+              src={WEB_MAIL_CONFIG.images.hero}
+              alt="退職ばあ様"
+              className="mt-2 h-36 w-auto self-center object-contain sm:mt-0 sm:h-52 sm:self-end lg:h-60"
+            />
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,620px)_minmax(0,1fr)]">
+          <section className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm">
+            <h2 className="mb-6 text-2xl font-black text-[#082f5f]">入力・確認</h2>
+
+            <div className="mb-6 rounded-2xl border border-sky-200 bg-sky-50 p-4">
               <div className="text-sm text-slate-600">郵送補助料金</div>
               <div className="mt-2 flex items-end justify-between gap-4">
                 <div className="text-sm text-slate-500">
                   <div>通常価格：{basePrice}円</div>
-                  {FREE_CAMPAIGN ? (
+                  {WEB_MAIL_CONFIG.freeCampaign ? (
                     <div>無料期間適用：- {basePrice}円</div>
                   ) : (
                     <div>現在の割引：- {discountAmount}円</div>
                   )}
                 </div>
-                <div className="text-2xl font-bold text-blue-700">
+                <div className="text-2xl font-black text-[#0f766e]">
                   {displayFinalPrice}円
                 </div>
               </div>
@@ -882,13 +1021,13 @@ export default function WebMailPage() {
 
             <div className="space-y-4">
               <Field
-                label="所属部署名"
+                label="所属部署名（任意）"
                 value={form.department}
                 onChange={handleChange("department")}
               />
 
               <Field
-                label="宛名"
+                label="宛名（任意・空欄時はご担当者様）"
                 value={form.recipientName}
                 onChange={handleChange("recipientName")}
                 placeholder="ご担当者"
@@ -926,29 +1065,35 @@ export default function WebMailPage() {
 
               <hr />
 
-              <div>
-                <div className="mb-2 block text-lg font-bold">退職理由の補足</div>
-                <label className="flex items-start gap-2 text-base leading-7">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={form.healthConditionNote}
-                    onChange={handleChange("healthConditionNote")}
-                  />
-                  <span>
-                    体調不良により勤務継続が困難である旨を記載する
-                    <span className="block text-sm text-slate-500">
-                      本文冒頭の「退職に伴う書類を送付いたします。」の直後に追記されます。
+              <GuidePanel image={WEB_MAIL_CONFIG.images.point} large>
+                <div>
+                  <div className="mb-2 block text-lg font-bold text-[#082f5f]">
+                    退職理由の補足
+                  </div>
+                  <label className="flex items-start gap-2 text-base leading-7">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={form.healthConditionNote}
+                      onChange={handleChange("healthConditionNote")}
+                    />
+                    <span>
+                      体調不良により勤務継続・電話応対が困難である旨を記載する
+                      <span className="block text-sm text-slate-500">
+                        本文冒頭の「退職に伴う書類を送付いたします。」の直後に追記されます。
+                      </span>
                     </span>
-                  </span>
-                </label>
-              </div>
+                  </label>
+                </div>
+              </GuidePanel>
 
               <hr />
 
               <div>
-                <div className="mb-2 block text-lg font-bold">返却頂くもの</div>
-                <div className="rounded-xl border bg-slate-50 p-4 text-sm leading-7">
+                <div className="mb-2 block text-lg font-bold text-[#082f5f]">
+                  返却頂くもの
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-7">
                   <div>・源泉徴収票</div>
                   <div>・最後の給与明細</div>
                   <div>・離職票</div>
@@ -979,7 +1124,7 @@ export default function WebMailPage() {
                 </div>
 
                 {form.depositDocsMode === "has" && (
-                  <div className="mt-3 space-y-4 rounded-xl border bg-slate-50 p-4">
+                  <div className="mt-3 space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="space-y-2">
                       <div className="text-base font-bold">年金関連書類</div>
 
@@ -1043,7 +1188,9 @@ export default function WebMailPage() {
               <hr />
 
               <div>
-                <div className="mb-2 block text-lg font-bold">私物返送</div>
+                <div className="mb-2 block text-lg font-bold text-[#082f5f]">
+                  私物返送
+                </div>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-base">
                     <input
@@ -1081,7 +1228,9 @@ export default function WebMailPage() {
               <hr />
 
               <div>
-                <div className="mb-2 block text-lg font-bold">返却物</div>
+                <div className="mb-2 block text-lg font-bold text-[#082f5f]">
+                  返却物
+                </div>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-base">
                     <input
@@ -1116,20 +1265,24 @@ export default function WebMailPage() {
                 />
               )}
 
-              <div className="space-y-3 rounded-xl border bg-amber-50 p-4 text-sm leading-7 text-slate-700">
-                <p>郵送物に入りきらない場合は、お手数ですが別送をご検討ください。</p>
-                <p className="font-bold text-slate-900">
-                  会社側も回収物が残ってしまった場合は、貴方へ連絡を取らざるを得なくなります。
-                </p>
-                <p className="font-bold text-slate-900">
-                  やり取りを減らすためにも、返却はしておきましょう。
-                </p>
-              </div>
+              <GuidePanel image={WEB_MAIL_CONFIG.images.gassho}>
+                <div className="space-y-3 text-sm leading-7 text-slate-700">
+                  <p>郵送物に入りきらない場合は、お手数ですが別送をご検討ください。</p>
+                  <p className="font-bold text-slate-900">
+                    会社側も回収物が残ってしまった場合は、貴方へ連絡を取らざるを得なくなります。
+                  </p>
+                  <p className="font-bold text-slate-900">
+                    やり取りを減らすためにも、返却はしておきましょう。
+                  </p>
+                </div>
+              </GuidePanel>
 
               <hr />
 
               <div>
-                <div className="mb-2 block text-lg font-bold">住民税</div>
+                <div className="mb-2 block text-lg font-bold text-[#082f5f]">
+                  住民税
+                </div>
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-base">
                     <input
@@ -1165,26 +1318,46 @@ export default function WebMailPage() {
                   </label>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.open("/next-step#resident-tax", "_blank", "noopener,noreferrer");
-                  }}
-                  className="mt-3 w-full rounded-xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 hover:bg-blue-100"
-                >
-                  ご不明な方は、リンク先の4.住民税をご参照ください。
-                </button>
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(
+                        WEB_MAIL_CONFIG.paths.nextStepResidentTax,
+                        "_blank",
+                        "noopener,noreferrer"
+                      );
+                    }}
+                    className="w-full rounded-xl border border-sky-300 bg-sky-50 px-4 py-3 text-sm font-bold text-[#075985] hover:bg-sky-100"
+                  >
+                    ご不明な方はこちら
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(
+                        WEB_MAIL_CONFIG.paths.residentTaxGuide,
+                        "_blank",
+                        "noopener,noreferrer"
+                      );
+                    }}
+                    className="w-full rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800 hover:bg-amber-100"
+                  >
+                    住民税の解説を見る
+                  </button>
+                </div>
               </div>
             </div>
           </section>
 
           <div className="space-y-6">
-            <section className="rounded-3xl border bg-white p-0">
+            <section className="rounded-3xl border border-sky-100 bg-white p-0 shadow-sm">
               <div className="px-6 pt-6">
-                <div className="mb-6 rounded-2xl border-2 border-red-400 bg-red-50 p-6 text-center text-xl font-bold leading-8 text-red-700">
-                  この画面で最終確認してから決済してください。（訂正できません）
+                <div className="mb-6 rounded-2xl border-2 border-red-300 bg-red-50 p-6 text-center text-xl font-bold leading-8 text-red-700">
+                  この画面で最終確認してから進んでください。（訂正できません）
                   <br />
-                  決済後はすぐにPDFをダウンロードしてください（再発行できません）。
+                  完了後はすぐにPDFをダウンロードしてください（再発行できません）。
                 </div>
               </div>
 
@@ -1197,7 +1370,7 @@ export default function WebMailPage() {
                   <button
                     type="button"
                     onClick={() => setIsPreviewOpen(true)}
-                    className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-bold text-white"
+                    className="rounded-lg bg-[#145da0] px-3 py-2 text-xs font-bold text-white"
                   >
                     拡大して確認
                   </button>
@@ -1221,25 +1394,25 @@ export default function WebMailPage() {
             </section>
 
             <div className="grid gap-3">
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                この郵送補助では、退職時に発生するやり取りを事前に整理したうえで作成できます。
-                <br />
-                やり取りを減らしたい方は、このまま進んでください。
-              </div>
+              <GuidePanel image={WEB_MAIL_CONFIG.images.think}>
+                <p className="text-sm font-bold leading-7 text-slate-900">
+                  会社側が退職届を確認した後に発生しやすいやり取りを、この送り状で先に整理しておきます。
+                </p>
+              </GuidePanel>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-5">
-                <h2 className="text-xl font-bold text-slate-900">次の決済画面</h2>
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 pr-5 shadow-sm sm:pr-36">
+                <h2 className="text-xl font-black text-[#082f5f]">次の決済画面</h2>
                 <p className="mt-2 text-sm leading-7 text-slate-600">
-                  現在は無料期間中です。このまま次へ進めます。
+                  現在は無料期間中です。ここまで確認できたら、このまま次へ進めます。
                 </p>
 
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                   <div className="text-sm text-slate-600">現在の料金</div>
-                  <div className="mt-1 text-2xl font-bold text-emerald-700">
+                  <div className="mt-1 text-2xl font-black text-emerald-700">
                     {displayFinalPrice}円
                   </div>
                   <div className="mt-2 text-sm text-emerald-700">
-                    {FREE_CAMPAIGN_LABEL}
+                    {WEB_MAIL_CONFIG.freeCampaignLabel}
                   </div>
                 </div>
 
@@ -1247,24 +1420,37 @@ export default function WebMailPage() {
                   type="button"
                   disabled={!canGenerate}
                   onClick={() => {
-                    saveHandoffData();
+                    const saved = saveHandoffData();
+                    const checkoutRaw = sessionStorage.getItem(CHECKOUT_HANDOFF_KEY);
 
-                    sessionStorage.setItem("web-mail-paid", "true");
-                    window.location.href = "/success?paid=1";
+                    if (!saved || !checkoutRaw) {
+                      alert(
+                        "確認画面へ進むための情報保存に失敗しました。入力内容を確認して、もう一度お試しください。"
+                      );
+                      return;
+                    }
+
+                    window.location.href = WEB_MAIL_CONFIG.paths.checkout;
                   }}
-                  className="mt-4 w-full rounded-xl bg-blue-600 py-3 text-white disabled:bg-gray-300"
+                  className="mt-4 w-full rounded-xl bg-[#145da0] py-3 font-bold text-white disabled:bg-gray-300"
                 >
-                  次の決済画面へ進む（今は無料）
+                  内容を確認して、次へ進む（今は無料）
                 </button>
+
+                <img
+                  src={WEB_MAIL_CONFIG.images.thumbsUp}
+                  alt="退職ばあ様"
+                  className="mt-4 h-28 w-auto object-contain sm:absolute sm:right-4 sm:top-4 sm:mt-0 sm:h-32"
+                />
               </div>
 
               <button
                 type="button"
                 onClick={() => {
                   saveReturnToRetirementPageData();
-                  window.location.href = "/";
+                  window.location.href = WEB_MAIL_CONFIG.paths.retirementTop;
                 }}
-                className="w-full rounded-xl border border-slate-300 bg-white py-3 text-slate-700"
+                className="w-full rounded-xl border border-slate-300 bg-white py-3 text-slate-700 hover:bg-slate-50"
               >
                 退職届作成ページへ戻る
               </button>
@@ -1303,6 +1489,37 @@ export default function WebMailPage() {
   );
 }
 
+function GuidePanel({
+  image,
+  children,
+  large = false,
+}: {
+  image: string;
+  children: React.ReactNode;
+  large?: boolean;
+}) {
+  return (
+    <div
+      className={
+        large
+          ? "flex flex-col items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-center sm:flex-row sm:items-start sm:gap-4 sm:text-left"
+          : "flex items-start gap-4 rounded-xl border border-amber-200 bg-amber-50 p-4"
+      }
+    >
+      <img
+        src={image}
+        alt="退職ばあ様"
+        className={
+          large
+            ? "h-32 w-28 shrink-0 object-contain sm:h-40 sm:w-36"
+            : "h-20 w-16 shrink-0 object-contain sm:h-24 sm:w-20"
+        }
+      />
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
 function Field({
   label,
   value,
@@ -1316,12 +1533,12 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-lg font-bold">{label}</label>
+      <label className="mb-1 block text-lg font-bold text-[#082f5f]">{label}</label>
       <input
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className="w-full rounded-xl border p-3"
+        className="w-full rounded-xl border border-slate-300 p-3 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
       />
     </div>
   );
@@ -1340,13 +1557,13 @@ function TextAreaField({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-lg font-bold">{label}</label>
+      <label className="mb-1 block text-lg font-bold text-[#082f5f]">{label}</label>
       <textarea
         value={value}
         onChange={onChange}
         placeholder={placeholder}
         rows={4}
-        className="w-full rounded-xl border p-3"
+        className="w-full rounded-xl border border-slate-300 p-3 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-100"
       />
     </div>
   );

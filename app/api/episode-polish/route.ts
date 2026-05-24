@@ -92,7 +92,7 @@ ${stressRelief || "未入力"}
 `;
 
     const response = await client.responses.create({
-      model: "gpt-5.4",
+      model: "gpt-4o-mini",
       reasoning: { effort: "low" },
       input: prompt,
       text: {
@@ -121,7 +121,6 @@ ${stressRelief || "未入力"}
       },
     });
 
-    
     const content = response.output_text;
 
     if (!content) {
@@ -153,13 +152,13 @@ ${stressRelief || "未入力"}
     }
 
     return NextResponse.json(parsed);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("episode-polish error:", error);
 
     return NextResponse.json(
       {
         error: "AI整形に失敗しました。",
-        detail: error?.message || "unknown error",
+        detail: error instanceof Error ? error.message : "unknown error",
       },
       { status: 500 }
     );
