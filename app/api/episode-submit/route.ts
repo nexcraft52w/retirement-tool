@@ -10,21 +10,13 @@ export async function POST(req: NextRequest) {
       title,
       body: content,
       stressRelief,
-      companyName,
-      senderName,
-      senderAddress,
       discountType,
       discountAmount,
-      aiPolishedTitle,
-      aiPolishedBody,
-      aiPolishedStressRelief,
     } = requestBody;
 
     if (!title || !content) {
       return NextResponse.json({ error: "入力不足です" }, { status: 400 });
     }
-
-    const usePolished = discountType === "post_and_polish";
 
     const { data, error } = await supabaseAdmin
       .from("episodes")
@@ -33,17 +25,15 @@ export async function POST(req: NextRequest) {
         title,
         body: content,
         stress_relief: stressRelief || "",
-        company_name: companyName || "",
-        sender_name: senderName || "",
-        sender_address: senderAddress || "",
-        discount_type: discountType || "none",
+        company_name: "",
+        sender_name: "",
+        sender_address: "",
+        discount_type: discountType || "post",
         discount_amount: Number(discountAmount) || 0,
 
-        ai_polished_title: usePolished ? aiPolishedTitle || "" : "",
-        ai_polished_body: usePolished ? aiPolishedBody || "" : "",
-        ai_polished_stress_relief: usePolished
-          ? aiPolishedStressRelief || ""
-          : "",
+        ai_polished_title: "",
+        ai_polished_body: "",
+        ai_polished_stress_relief: "",
 
         status: "unchecked",
         is_public: false,

@@ -4,8 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const EPISODE_BASE_PRICE = 1500;
-const EPISODE_POST_DISCOUNT = 300;
-const AI_POLISH_DISCOUNT = 200;
+const EPISODE_POST_DISCOUNT = 500;
 
 const STORAGE_KEYS = {
   retirementDraft: "retirement-document-draft-v1",
@@ -20,7 +19,6 @@ const ROUTES = {
 } as const;
 
 const API_ENDPOINTS = {
-  episodePolish: "/api/episode-polish",
   episodeSubmit: "/api/episode-submit",
 } as const;
 
@@ -28,7 +26,6 @@ const MIN_PEN_NAME = 1;
 const MIN_SUBJECT = 4;
 const MIN_BODY = 150;
 const MAX_BODY = 3000;
-const MAX_AI_POLISH_TRIES = 3;
 
 const PUBLIC_IMAGE_BASE = "/images/taishoku-baasama";
 
@@ -60,63 +57,10 @@ type JudgeResult = {
   reasons: string[];
 };
 
-type PolishResponse = {
-  subjectPolished?: string;
-  bodyPolished?: string;
-  stressReliefPolished?: string;
-  anonymousCheckNote?: string;
-  error?: string;
-};
-
-type EpisodeSnapshot = {
-  penName: string;
-  subject: string;
-  body: string;
-  stressRelief: string;
-};
-
-type RetirementFormData = {
-  name?: string;
-  address?: string;
-  department?: string;
-  companyName?: string;
-  companyAddress?: string;
-  representativeName?: string;
-  retirementDate?: string;
-};
-
-type RetirementDraftPayload = {
-  documentType?: "wish" | "notice";
-  form?: RetirementFormData;
-};
-
-type RetirementHandoffPayload = {
-  sourcePage?: string;
-  returnPath?: string;
-  documentType?: "wish" | "notice";
-  documentTitle?: string;
-  companyName?: string;
-  senderName?: string;
-  senderDepartment?: string;
-  senderAddress?: string;
-  companyAddress?: string;
-  representativeName?: string;
-  retirementDate?: string;
-  basePrice?: number;
-  discountMin?: number;
-  discountMax?: number;
-  discountedPriceMin?: number;
-  discountedPriceMax?: number;
-  episodePosted?: boolean;
-  canGoBack?: boolean;
-  updatedAt?: string;
-};
-
 type HandoffPayload = {
   discount: {
     basePrice: number;
     episodeDiscountApplied: boolean;
-    aiPolishDiscountApplied: boolean;
     totalDiscount: number;
     finalPrice: number;
   };
@@ -125,13 +69,7 @@ type HandoffPayload = {
     subject: string;
     body: string;
     stressRelief: string;
-    aiPolishExecuted: boolean;
-    aiPolishAdopted: boolean;
-    anonymousCheckNote: string;
-    aiPolishedBody: string;
-    companyName: string;
   };
-  retirementForm: RetirementFormData;
   createdAt: string;
 };
 
@@ -141,23 +79,10 @@ type EpisodeDraft = {
   body: string;
   stressRelief: string;
 
-  subjectPreview: string;
-  normalizedPreview: string;
-  normalizedStressPreview: string;
-  anonymousCheckNote: string;
-
   judgeReasons: string[];
   submitMessage: string;
 
   episodeDiscountApplied: boolean;
-  aiPolishDiscountApplied: boolean;
-
-  aiPolishExecuted: boolean;
-  aiPolishAdopted: boolean;
-  aiPolishTryCount: number;
-
-  originalSnapshot: EpisodeSnapshot | null;
-  polishedSnapshot: EpisodeSnapshot | null;
 
   isSubmitted: boolean;
 };
@@ -165,7 +90,6 @@ type EpisodeDraft = {
 type EpisodePricingResult = {
   basePrice: number;
   episodeDiscount: number;
-  aiPolishDiscount: number;
   totalDiscount: number;
   finalPrice: number;
 };
@@ -248,17 +172,14 @@ function judgePost(
 
 function resolveEpisodePricing(params: {
   episodeDiscountApplied: boolean;
-  aiPolishDiscountApplied: boolean;
 }): EpisodePricingResult {
   const episodeDiscount = params.episodeDiscountApplied ? EPISODE_POST_DISCOUNT : 0;
-  const aiPolishDiscount = params.aiPolishDiscountApplied ? AI_POLISH_DISCOUNT : 0;
-  const totalDiscount = episodeDiscount + aiPolishDiscount;
+  const totalDiscount = episodeDiscount;
   const finalPrice = Math.max(EPISODE_BASE_PRICE - totalDiscount, 0);
 
   return {
     basePrice: EPISODE_BASE_PRICE,
     episodeDiscount,
-    aiPolishDiscount,
     totalDiscount,
     finalPrice,
   };
@@ -270,23 +191,10 @@ const INITIAL_DRAFT: EpisodeDraft = {
   body: "",
   stressRelief: "",
 
-  subjectPreview: "",
-  normalizedPreview: "",
-  normalizedStressPreview: "",
-  anonymousCheckNote: "",
-
   judgeReasons: [],
   submitMessage: "",
 
   episodeDiscountApplied: false,
-  aiPolishDiscountApplied: false,
-
-  aiPolishExecuted: false,
-  aiPolishAdopted: false,
-  aiPolishTryCount: 0,
-
-  originalSnapshot: null,
-  polishedSnapshot: null,
 
   isSubmitted: false,
 };
@@ -294,53 +202,19 @@ const INITIAL_DRAFT: EpisodeDraft = {
 export default function EpisodePage() {
   const router = useRouter();
 
-  const [retirementForm, setRetirementForm] = useState<RetirementFormData | null>(null);
+  const [hasRetirementDraft, setHasRetirementDraft] = useState(false);
 
   const [penName, setPenName] = useState(INITIAL_DRAFT.penName);
   const [subject, setSubject] = useState(INITIAL_DRAFT.subject);
   const [body, setBody] = useState(INITIAL_DRAFT.body);
   const [stressRelief, setStressRelief] = useState(INITIAL_DRAFT.stressRelief);
 
-  const [subjectPreview, setSubjectPreview] = useState(INITIAL_DRAFT.subjectPreview);
-  const [normalizedPreview, setNormalizedPreview] = useState(
-    INITIAL_DRAFT.normalizedPreview
-  );
-  const [normalizedStressPreview, setNormalizedStressPreview] = useState(
-    INITIAL_DRAFT.normalizedStressPreview
-  );
-  const [anonymousCheckNote, setAnonymousCheckNote] = useState(
-    INITIAL_DRAFT.anonymousCheckNote
-  );
-
   const [judgeReasons, setJudgeReasons] = useState<string[]>(INITIAL_DRAFT.judgeReasons);
   const [submitMessage, setSubmitMessage] = useState(INITIAL_DRAFT.submitMessage);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [isPolishing, setIsPolishing] = useState(false);
-  const [polishError, setPolishError] = useState("");
-
   const [episodeDiscountApplied, setEpisodeDiscountApplied] = useState(
     INITIAL_DRAFT.episodeDiscountApplied
-  );
-  const [aiPolishDiscountApplied, setAiPolishDiscountApplied] = useState(
-    INITIAL_DRAFT.aiPolishDiscountApplied
-  );
-
-  const [aiPolishExecuted, setAiPolishExecuted] = useState(
-    INITIAL_DRAFT.aiPolishExecuted
-  );
-  const [aiPolishAdopted, setAiPolishAdopted] = useState(
-    INITIAL_DRAFT.aiPolishAdopted
-  );
-  const [aiPolishTryCount, setAiPolishTryCount] = useState(
-    INITIAL_DRAFT.aiPolishTryCount
-  );
-
-  const [originalSnapshot, setOriginalSnapshot] = useState<EpisodeSnapshot | null>(
-    INITIAL_DRAFT.originalSnapshot
-  );
-  const [polishedSnapshot, setPolishedSnapshot] = useState<EpisodeSnapshot | null>(
-    INITIAL_DRAFT.polishedSnapshot
   );
 
   const [isSubmitted, setIsSubmitted] = useState(INITIAL_DRAFT.isSubmitted);
@@ -350,15 +224,13 @@ export default function EpisodePage() {
       const savedDraft = sessionStorage.getItem(STORAGE_KEYS.episodeDraft);
       if (!savedDraft) return;
 
-      const parsed = JSON.parse(savedDraft) as EpisodeDraft;
+      const parsed = JSON.parse(savedDraft) as Partial<EpisodeDraft>;
       const restoredSubmitted = Boolean(parsed.isSubmitted);
 
       setPenName(parsed.penName ?? "");
       setSubject(parsed.subject ?? "");
       setBody(parsed.body ?? "");
       setStressRelief(parsed.stressRelief ?? "");
-
-      setAnonymousCheckNote(parsed.anonymousCheckNote ?? "");
 
       setJudgeReasons(Array.isArray(parsed.judgeReasons) ? parsed.judgeReasons : []);
       setSubmitMessage(
@@ -368,27 +240,6 @@ export default function EpisodePage() {
       );
 
       setEpisodeDiscountApplied(Boolean(parsed.episodeDiscountApplied));
-      setAiPolishDiscountApplied(
-        Boolean(parsed.aiPolishDiscountApplied) &&
-          Boolean(parsed.aiPolishAdopted) &&
-          Boolean(parsed.polishedSnapshot)
-      );
-
-      setAiPolishExecuted(Boolean(parsed.aiPolishExecuted));
-      setAiPolishAdopted(Boolean(parsed.aiPolishAdopted));
-      setAiPolishTryCount(
-        typeof parsed.aiPolishTryCount === "number"
-          ? Math.min(Math.max(parsed.aiPolishTryCount, 0), MAX_AI_POLISH_TRIES)
-          : 0
-      );
-
-      setSubjectPreview(parsed.subjectPreview ?? "");
-      setNormalizedPreview(parsed.normalizedPreview ?? "");
-      setNormalizedStressPreview(parsed.normalizedStressPreview ?? "");
-
-      setOriginalSnapshot(parsed.originalSnapshot ?? null);
-      setPolishedSnapshot(parsed.polishedSnapshot ?? null);
-
       setIsSubmitted(restoredSubmitted);
     } catch (error) {
       console.error("failed to restore episode draft", error);
@@ -397,28 +248,11 @@ export default function EpisodePage() {
 
   useEffect(() => {
     try {
-      const handoffRaw = sessionStorage.getItem(STORAGE_KEYS.retirementHandoff);
-      if (handoffRaw) {
-        const handoff = JSON.parse(handoffRaw) as RetirementHandoffPayload;
-        setRetirementForm({
-          name: handoff.senderName ?? "",
-          address: handoff.senderAddress ?? "",
-          department: handoff.senderDepartment ?? "",
-          companyName: handoff.companyName ?? "",
-          companyAddress: handoff.companyAddress ?? "",
-          representativeName: handoff.representativeName ?? "",
-          retirementDate: handoff.retirementDate ?? "",
-        });
-        return;
-      }
-
-      const draftRaw = sessionStorage.getItem(STORAGE_KEYS.retirementDraft);
-      if (draftRaw) {
-        const draft = JSON.parse(draftRaw) as RetirementDraftPayload;
-        setRetirementForm(draft.form ?? {});
-      }
+      const hasHandoff = Boolean(sessionStorage.getItem(STORAGE_KEYS.retirementHandoff));
+      const hasDraft = Boolean(sessionStorage.getItem(STORAGE_KEYS.retirementDraft));
+      setHasRetirementDraft(hasHandoff || hasDraft);
     } catch (error) {
-      console.error("failed to load retirement form", error);
+      console.error("failed to check retirement draft", error);
     }
   }, []);
 
@@ -430,23 +264,10 @@ export default function EpisodePage() {
         body,
         stressRelief,
 
-        subjectPreview,
-        normalizedPreview,
-        normalizedStressPreview,
-        anonymousCheckNote,
-
         judgeReasons,
         submitMessage,
 
         episodeDiscountApplied,
-        aiPolishDiscountApplied,
-
-        aiPolishExecuted,
-        aiPolishAdopted,
-        aiPolishTryCount,
-
-        originalSnapshot,
-        polishedSnapshot,
 
         isSubmitted,
       };
@@ -460,123 +281,27 @@ export default function EpisodePage() {
     subject,
     body,
     stressRelief,
-    subjectPreview,
-    normalizedPreview,
-    normalizedStressPreview,
-    anonymousCheckNote,
     judgeReasons,
     submitMessage,
     episodeDiscountApplied,
-    aiPolishDiscountApplied,
-    aiPolishExecuted,
-    aiPolishAdopted,
-    aiPolishTryCount,
-    originalSnapshot,
-    polishedSnapshot,
     isSubmitted,
   ]);
 
   const pricing = useMemo(() => {
     return resolveEpisodePricing({
       episodeDiscountApplied,
-      aiPolishDiscountApplied,
     });
-  }, [episodeDiscountApplied, aiPolishDiscountApplied]);
+  }, [episodeDiscountApplied]);
 
   const subjectCount = subject.trim().length;
   const bodyCount = normalizeText(body).length;
-  const canTryAiPolish =
-    !isPolishing &&
-    !isSubmitted &&
-    normalizeText(body).length > 0 &&
-    aiPolishTryCount < MAX_AI_POLISH_TRIES &&
-    !aiPolishExecuted;
-  const companyName = retirementForm?.companyName?.trim() || "";
   const submitDisabled = isSubmitting || isSubmitted;
-
-  const aiPolishedBody = polishedSnapshot?.body?.trim() || "";
-  const aiPolishedSubject = polishedSnapshot?.subject?.trim() || "";
-  const aiPolishedStressRelief = polishedSnapshot?.stressRelief?.trim() || "";
-
-  const handleAiPolishPreview = async () => {
-    if (!canTryAiPolish || isPolishing) return;
-
-    setIsPolishing(true);
-    setPolishError("");
-    setSubmitMessage("");
-    setJudgeReasons([]);
-
-    try {
-      const currentSnapshot: EpisodeSnapshot = {
-        penName,
-        subject,
-        body,
-        stressRelief,
-      };
-
-      const res = await fetch(API_ENDPOINTS.episodePolish, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(currentSnapshot),
-      });
-
-      const data: PolishResponse = await res.json();
-
-      if (!res.ok) {
-        setPolishError(data?.error || "AI整形に失敗しました。");
-        return;
-      }
-
-      const nextPolishedSnapshot: EpisodeSnapshot = {
-        penName,
-        subject: data.subjectPolished || subject,
-        body: data.bodyPolished || body,
-        stressRelief: data.stressReliefPolished || stressRelief,
-      };
-
-      setOriginalSnapshot(currentSnapshot);
-      setPolishedSnapshot(nextPolishedSnapshot);
-
-      setSubjectPreview(nextPolishedSnapshot.subject);
-      setNormalizedPreview(nextPolishedSnapshot.body);
-      setNormalizedStressPreview(nextPolishedSnapshot.stressRelief);
-      setAnonymousCheckNote(data.anonymousCheckNote || "");
-
-      setAiPolishExecuted(true);
-      setAiPolishAdopted(false);
-      setAiPolishDiscountApplied(false);
-      setAiPolishTryCount((prev) => prev + 1);
-      setPolishError("");
-    } catch (error) {
-      console.error(error);
-      setPolishError("通信エラーが発生しました。時間をおいて再度お試しください。");
-    } finally {
-      setIsPolishing(false);
-    }
-  };
-
-  const handleAdoptPolish = () => {
-    if (!polishedSnapshot) return;
-
-    setAiPolishAdopted(true);
-    setAiPolishDiscountApplied(true);
-    setPolishError("");
-  };
-
-  const handleRevertPolish = () => {
-    setAiPolishAdopted(false);
-    setAiPolishDiscountApplied(false);
-    setPolishError("");
-  };
 
   const buildHandoffPayload = (): HandoffPayload => {
     return {
       discount: {
         basePrice: pricing.basePrice,
         episodeDiscountApplied,
-        aiPolishDiscountApplied,
         totalDiscount: pricing.totalDiscount,
         finalPrice: pricing.finalPrice,
       },
@@ -585,13 +310,7 @@ export default function EpisodePage() {
         subject,
         body,
         stressRelief,
-        aiPolishExecuted,
-        aiPolishAdopted,
-        anonymousCheckNote,
-        aiPolishedBody,
-        companyName,
       },
-      retirementForm: retirementForm || {},
       createdAt: new Date().toISOString(),
     };
   };
@@ -602,7 +321,6 @@ export default function EpisodePage() {
     setIsSubmitting(true);
     setSubmitMessage("");
     setJudgeReasons([]);
-    setPolishError("");
 
     try {
       const result = judgePost(penName, subject, body, stressRelief);
@@ -613,10 +331,8 @@ export default function EpisodePage() {
       }
 
       const nextEpisodeDiscountApplied = true;
-      const nextAiPolishDiscountApplied = aiPolishAdopted;
       const nextPricing = resolveEpisodePricing({
         episodeDiscountApplied: nextEpisodeDiscountApplied,
-        aiPolishDiscountApplied: nextAiPolishDiscountApplied,
       });
 
       const response = await fetch(API_ENDPOINTS.episodeSubmit, {
@@ -629,11 +345,7 @@ export default function EpisodePage() {
           title: subject,
           body,
           stressRelief,
-          aiPolishedTitle: aiPolishAdopted ? aiPolishedSubject : "",
-          aiPolishedBody: aiPolishAdopted ? aiPolishedBody : "",
-          aiPolishedStressRelief: aiPolishAdopted ? aiPolishedStressRelief : "",
-          companyName,
-          discountType: aiPolishAdopted ? "post_and_polish" : "post",
+          discountType: "post",
           discountAmount: nextPricing.totalDiscount,
         }),
       });
@@ -646,13 +358,10 @@ export default function EpisodePage() {
       }
 
       setEpisodeDiscountApplied(nextEpisodeDiscountApplied);
-      setAiPolishDiscountApplied(nextAiPolishDiscountApplied);
       setIsSubmitted(true);
 
       setSubmitMessage(
-        nextAiPolishDiscountApplied
-          ? `自動審査に通過しました。合計${nextPricing.totalDiscount}円引きが適用されました。必要であればこのまま郵送補助へ進めます。`
-          : `自動審査に通過しました。${nextPricing.totalDiscount}円引きが適用されました。必要であればこのまま郵送補助へ進めます。`
+        `自動審査に通過しました。${nextPricing.totalDiscount}円引きが適用されました。必要であればこのまま郵送補助へ進めます。`
       );
     } catch (error) {
       console.error("episode submit error:", error);
@@ -685,25 +394,10 @@ export default function EpisodePage() {
     setBody("");
     setStressRelief("");
 
-    setSubjectPreview("");
-    setNormalizedPreview("");
-    setNormalizedStressPreview("");
-    setAnonymousCheckNote("");
-
     setJudgeReasons([]);
     setSubmitMessage("");
-    setPolishError("");
 
     setEpisodeDiscountApplied(false);
-    setAiPolishDiscountApplied(false);
-
-    setAiPolishExecuted(false);
-    setAiPolishAdopted(false);
-    setAiPolishTryCount(0);
-
-    setOriginalSnapshot(null);
-    setPolishedSnapshot(null);
-
     setIsSubmitted(false);
 
     try {
@@ -736,7 +430,7 @@ export default function EpisodePage() {
               </h1>
 
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                退職届作成ページの情報を受け取り、割引情報を整理したうえで、次の郵送補助ページへ引き継ぎます。
+                投稿内容と割引情報を整理したうえで、次の郵送補助ページへ引き継ぎます。
               </p>
 
               <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -744,7 +438,7 @@ export default function EpisodePage() {
               </p>
 
               <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                書ける範囲で大丈夫です。個人名・会社名など、特定につながる内容は入れないでください。
+                書ける範囲で大丈夫です。掲載・SNS・動画等で使用する際は、個人名・会社名など特定につながる情報を伏せて利用します。
               </div>
             </div>
 
@@ -758,10 +452,10 @@ export default function EpisodePage() {
           </div>
         </div>
 
-        {!retirementForm && (
+        {!hasRetirementDraft && (
           <section className="mb-6 rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
             <p className="text-sm leading-6 text-amber-800">
-              退職届ページの入力内容が見つかりませんでした。先に退職届を作成してから進むと、次ページへの引き継ぎがスムーズです。
+              退職届ページの入力内容が見つかりませんでした。先に退職届を作成してから進むと、割引情報の引き継ぎがスムーズです。
             </p>
           </section>
         )}
@@ -834,105 +528,14 @@ export default function EpisodePage() {
                 />
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="font-semibold text-slate-900">
-                  AI整形オプション（さらに200円引き）
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
+                <div className="font-semibold text-emerald-900">
+                  エピソード投稿で500円引き
                 </div>
-                <div className="mt-1 text-sm leading-6 text-slate-600">
-                  共感されやすい形に整えつつ、個人や会社が特定されにくい表現へ調整します。
+                <div className="mt-1">
+                  投稿が自動審査を通過すると、郵送補助料金が1,500円から1,000円になります。
                 </div>
-                <div className="mt-2 text-xs text-slate-500">
-                  ※AI整形は1回のみ実行できます。内容を確認してから実行してください。
-                </div>
-
-                {!aiPolishExecuted && (
-                  <button
-                    type="button"
-                    onClick={handleAiPolishPreview}
-                    disabled={!canTryAiPolish || isPolishing}
-                    className="mt-4 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isPolishing
-                      ? "AIが文章を整形しています…"
-                      : "AI整形を実行する（さらに200円引き）"}
-                  </button>
-                )}
-
-                {!aiPolishExecuted && aiPolishTryCount >= MAX_AI_POLISH_TRIES && (
-                  <div className="mt-2 text-xs text-slate-500">
-                    AI整形の上限回数に達しました。
-                  </div>
-                )}
-
-                {aiPolishExecuted && (
-                  <div className="mt-4">
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700">
-                      AI整形済み
-                      {aiPolishAdopted
-                        ? "（割引適用中・原文はそのまま保存されます）"
-                        : "（まだ割引対象として選択していません）"}
-                    </div>
-
-                    <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                      <button
-                        type="button"
-                        onClick={handleAdoptPolish}
-                        className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                          aiPolishAdopted
-                            ? "bg-slate-900 text-white ring-2 ring-slate-300"
-                            : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                        }`}
-                      >
-                        この整形結果を使う
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleRevertPolish}
-                        className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                          !aiPolishAdopted
-                            ? "bg-slate-900 text-white ring-2 ring-slate-300"
-                            : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
-                        }`}
-                      >
-                        この整形結果を使わない
-                      </button>
-                    </div>
-
-                    <div className="mt-2 text-xs text-slate-500">
-                      {aiPolishAdopted
-                        ? "原文は変更せず、整形結果だけを別保存して割引対象にします。"
-                        : "現在は原文のみ投稿されます。必要なら整形結果もあわせて保存します。"}
-                    </div>
-                  </div>
-                )}
               </div>
-
-              <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h2 className="text-lg font-bold text-slate-900">整形後プレビュー</h2>
-
-                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
-                  <div className="mb-2 font-semibold text-slate-900">件名</div>
-                  {subjectPreview || "整形後の件名がここに表示されます。"}
-                </div>
-
-                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
-                  <div className="mb-2 font-semibold text-slate-900">本文</div>
-                  {normalizedPreview || "整形後の本文がここに表示されます。"}
-                </div>
-
-                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm leading-7 text-slate-700 whitespace-pre-line">
-                  <div className="mb-2 font-semibold text-slate-900">
-                    ストレス発散方法（任意）
-                  </div>
-                  {normalizedStressPreview || "整形後のストレス発散方法がここに表示されます。"}
-                </div>
-
-                <div className="mt-4 rounded-2xl bg-amber-50 p-4 text-sm leading-7 text-amber-900 whitespace-pre-line">
-                  <div className="mb-2 font-semibold">匿名化チェック</div>
-                  {anonymousCheckNote || "匿名化や表現調整の結果がここに表示されます。"}
-                </div>
-              </section>
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
@@ -949,7 +552,7 @@ export default function EpisodePage() {
                     ? "投稿済み"
                     : isSubmitting
                     ? "審査中..."
-                    : "投稿して割引を適用する"}
+                    : "投稿して500円引きを適用する"}
                 </button>
 
                 <button
@@ -1010,12 +613,6 @@ export default function EpisodePage() {
                   </div>
                 </div>
               )}
-
-              {polishError && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
-                  <div className="font-semibold text-red-700">{polishError}</div>
-                </div>
-              )}
             </div>
           </section>
 
@@ -1034,13 +631,8 @@ export default function EpisodePage() {
 
               <div className="mt-4 space-y-2 rounded-2xl bg-slate-50 p-4 text-sm leading-6">
                 <div className={episodeDiscountApplied ? "text-slate-800" : "text-slate-400"}>
-                  郵送補助 割引：-{EPISODE_POST_DISCOUNT}円
+                  エピソード投稿 割引：-{EPISODE_POST_DISCOUNT}円
                   {!episodeDiscountApplied && "（未適用）"}
-                </div>
-
-                <div className={aiPolishDiscountApplied ? "text-slate-800" : "text-slate-400"}>
-                  AI整形 割引：-{AI_POLISH_DISCOUNT}円
-                  {aiPolishDiscountApplied ? "（適用中）" : "（未適用）"}
                 </div>
 
                 <div className="border-t pt-2 font-semibold text-slate-900">

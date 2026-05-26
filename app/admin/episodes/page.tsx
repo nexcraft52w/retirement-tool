@@ -7,8 +7,6 @@ type EpisodeRow = {
   title: string | null;
   body: string | null;
   stress_relief: string | null;
-  ai_polished_body: string | null;
-  company_name: string | null;
   discount_type: string | null;
   discount_amount: number | null;
   is_publishable: boolean | null;
@@ -37,6 +35,12 @@ function getPublishClass(value: boolean | null) {
     : "bg-amber-50 text-amber-700 border-amber-200";
 }
 
+function getDiscountLabel(type: string | null, amount: number | null) {
+  if (!type || type === "none") return "未適用";
+  if (type === "post") return `エピソード投稿割引 / ${amount ?? 0}円`;
+  return `${type} / ${amount ?? 0}円`;
+}
+
 export default async function Page() {
   const { data, error } = await supabaseAdmin
     .from("episodes")
@@ -47,8 +51,6 @@ export default async function Page() {
       title,
       body,
       stress_relief,
-      ai_polished_body,
-      company_name,
       discount_type,
       discount_amount,
       is_publishable,
@@ -115,8 +117,7 @@ export default async function Page() {
                     </h2>
 
                     <div className="mt-2 text-sm leading-6 text-slate-600">
-                      ペンネーム：{row.pen_name || "-"} / 会社名：
-                      {row.company_name || "-"}
+                      ペンネーム：{row.pen_name || "-"}
                     </div>
                   </div>
 
@@ -135,7 +136,7 @@ export default async function Page() {
                       割引
                     </div>
                     <div className="mt-1 text-slate-800">
-                      {row.discount_type || "-"} / {row.discount_amount ?? 0}円
+                      {getDiscountLabel(row.discount_type, row.discount_amount)}
                     </div>
                   </div>
 
@@ -152,7 +153,7 @@ export default async function Page() {
                 {row.stress_relief && (
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-xs font-bold text-slate-500">
-                      投稿時の選択
+                      ストレス発散方法
                     </div>
                     <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-700">
                       {row.stress_relief}
@@ -168,17 +169,6 @@ export default async function Page() {
                     {row.body || "-"}
                   </p>
                 </div>
-
-                {row.ai_polished_body && (
-                  <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50 p-4">
-                    <div className="text-xs font-bold text-blue-700">
-                      AI整形後
-                    </div>
-                    <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-slate-800">
-                      {row.ai_polished_body}
-                    </p>
-                  </div>
-                )}
 
                 <div className="mt-4 rounded-2xl bg-slate-100 p-3 text-xs leading-6 text-slate-500">
                   ID：{row.id}

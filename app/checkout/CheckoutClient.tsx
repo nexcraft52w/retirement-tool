@@ -262,6 +262,12 @@ function buildLetterBodySections(preview: {
 function normalizeCheckoutHandoff(raw: Partial<CheckoutHandoff>): CheckoutHandoff {
   const senderAddress =
     raw.senderAddress || joinAddress(raw.senderAddress1, raw.senderAddress2);
+  const basePrice = numberOrDefault(raw.basePrice, BASE_PRICE);
+  const rawFinalPrice = numberOrDefault(raw.finalPrice, basePrice);
+  const rawDiscountAmount = numberOrDefault(raw.discountAmount, 0);
+  const discountAmount =
+    rawFinalPrice <= 0 ? Math.max(rawDiscountAmount, 0) : rawDiscountAmount > 0 ? 500 : 0;
+  const finalPrice = rawFinalPrice <= 0 ? 0 : Math.max(basePrice - discountAmount, 0);
 
   return {
     sessionId: raw.sessionId || getSessionId(),
@@ -275,9 +281,9 @@ function normalizeCheckoutHandoff(raw: Partial<CheckoutHandoff>): CheckoutHandof
     recipientName: raw.recipientName || "",
     department: raw.department || "",
     itemName: raw.itemName || "書類",
-    basePrice: numberOrDefault(raw.basePrice, BASE_PRICE),
-    discountAmount: numberOrDefault(raw.discountAmount, 0),
-    finalPrice: numberOrDefault(raw.finalPrice, BASE_PRICE),
+    basePrice,
+    discountAmount,
+    finalPrice,
     mailForm: raw.mailForm,
     coverLetterSections: Array.isArray(raw.coverLetterSections)
       ? raw.coverLetterSections.filter((v): v is string => typeof v === "string")
@@ -376,12 +382,9 @@ function buildWebMailStorageV2(args: {
             typeof parsed.senderName === "string"
               ? parsed.senderName
               : handoff.senderName,
-          basePrice: numberOrDefault(parsed.basePrice, handoff.basePrice),
-          discountAmount: numberOrDefault(
-            parsed.discountAmount,
-            handoff.discountAmount
-          ),
-          finalPrice: numberOrDefault(parsed.finalPrice, handoff.finalPrice),
+          basePrice: handoff.basePrice,
+          discountAmount: handoff.discountAmount,
+          finalPrice: handoff.finalPrice,
           coverLetterSections: handoff.coverLetterSections,
           coverLetterBody: handoff.coverLetterBody,
           updatedAt: now,
@@ -424,20 +427,15 @@ function preserveCheckoutState(args: {
   // checkout自身の受け渡し情報。mailFormも持たせ、web-mail-form-v1が読めない時の保険にする。
   sessionStorage.setItem(CHECKOUT_KEY, JSON.stringify(normalizedHandoff));
 
-  // web-mail-form-v1は、web-mail側が作った原本を最優先で保持する。
-  // checkout側で作り直すと、戻った時に入力済みデータが薄いデータで上書きされる。
-  if (webMailRawRef.current) {
-    sessionStorage.setItem(WEB_MAIL_KEY, webMailRawRef.current);
-  } else {
-    const webMailStorage = buildWebMailStorageV2({
-      handoff: normalizedHandoff,
-      webMailForm,
-      currentRaw: null,
-    });
+  // web-mail-form-v1は入力済みデータを保持しつつ、価格情報だけは現在のhandoffで上書きする。
+  const webMailStorage = buildWebMailStorageV2({
+    handoff: normalizedHandoff,
+    webMailForm,
+    currentRaw: webMailRawRef.current,
+  });
 
-    sessionStorage.setItem(WEB_MAIL_KEY, webMailStorage);
-    webMailRawRef.current = webMailStorage;
-  }
+  sessionStorage.setItem(WEB_MAIL_KEY, webMailStorage);
+  webMailRawRef.current = webMailStorage;
 
   // 退職届ページへ戻る時に金額も戻す。
   const currentRetirement =
@@ -810,8 +808,7 @@ export default function CheckoutClient() {
                 <div className="mt-3 text-sm leading-6 text-slate-700">
                   現在は無料でご利用いただけます。
                   <br />
-                  有料化後は 1,500円 → 1,200円 → 1,000円
-                  （割引適用時）となります。
+                  有料化後は通常 1,500円、エピソード投稿割引適用時は 1,000円です。
                 </div>
 
                 {handoff.basePrice > price && (

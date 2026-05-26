@@ -501,53 +501,11 @@ export default function RetirementDocumentToolMVP() {
   };
 
   const resolvePostalPricing = (): PostalPricingState => {
-    try {
-      const raw = sessionStorage.getItem(POSTAL_HANDOFF_KEY);
-      const webMailRaw = sessionStorage.getItem(WEB_MAIL_FORM_STORAGE_KEY);
-      const saved = raw ? JSON.parse(raw) : null;
-      const savedWebMail = webMailRaw
-        ? (JSON.parse(webMailRaw) as WebMailSavedState)
-        : null;
-
-      const basePrice =
-        typeof saved?.basePrice === "number"
-          ? saved.basePrice
-          : typeof savedWebMail?.basePrice === "number"
-            ? savedWebMail.basePrice
-            : POSTAL_BASE_PRICE;
-
-      const finalPrice =
-        typeof saved?.finalPrice === "number"
-          ? saved.finalPrice
-          : typeof saved?.discountedPriceMin === "number"
-            ? saved.discountedPriceMin
-            : typeof saved?.discountedPriceMax === "number"
-              ? saved.discountedPriceMax
-              : typeof savedWebMail?.finalPrice === "number"
-                ? savedWebMail.finalPrice
-                : FREE_CAMPAIGN
-                  ? 0
-                  : basePrice;
-
-      const discountAmount =
-        typeof saved?.discountAmount === "number"
-          ? saved.discountAmount
-          : typeof savedWebMail?.discountAmount === "number"
-            ? savedWebMail.discountAmount
-            : Math.max(0, basePrice - finalPrice);
-
-      return {
-        basePrice,
-        discountAmount,
-        finalPrice,
-      };
-    } catch {
-      return {
-        basePrice: POSTAL_BASE_PRICE,
-        discountAmount: FREE_CAMPAIGN ? POSTAL_BASE_PRICE : 0,
-        finalPrice: FREE_CAMPAIGN ? 0 : POSTAL_BASE_PRICE,
-      };
-    }
+    return {
+      basePrice: POSTAL_BASE_PRICE,
+      discountAmount: 0,
+      finalPrice: FREE_CAMPAIGN ? 0 : POSTAL_BASE_PRICE,
+    };
   };
 
   const saveCurrentRetirementData = () => {
@@ -1039,7 +997,7 @@ export default function RetirementDocumentToolMVP() {
 
                   <div className="mt-4 rounded-xl border border-amber-300 bg-white/70 px-4 py-3 text-xs leading-6 text-slate-700">
                     <div>
-                      ※会社名・差出人名・所属部署名・料金情報を次ページへ引き継ぎます
+                      ※会社名・差出人名・所属部署名などを次ページへ引き継ぎます
                     </div>
                     <div className="mt-2 pl-4 font-semibold text-amber-800">
                       次ページで内容を訂正したい場合は、用意する「戻る」ボタンから戻ってください
@@ -1110,7 +1068,7 @@ export default function RetirementDocumentToolMVP() {
                     退職時のエピソードを投稿して郵送補助をする場合、無料期間終了後は
                     <span className="font-semibold text-orange-700">
                       {" "}
-                      300円〜500円割引{" "}
+                      500円割引{" "}
                     </span>
                     です。
                   </p>

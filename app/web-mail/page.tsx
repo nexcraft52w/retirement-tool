@@ -85,7 +85,6 @@ type EpisodeDiscountHandoff = {
   discount?: {
     basePrice?: number;
     episodeDiscountApplied?: boolean;
-    aiPolishDiscountApplied?: boolean;
     totalDiscount?: number;
     finalPrice?: number;
   };
@@ -94,20 +93,6 @@ type EpisodeDiscountHandoff = {
     subject?: string;
     body?: string;
     stressRelief?: string;
-    aiPolishExecuted?: boolean;
-    aiPolishAdopted?: boolean;
-    anonymousCheckNote?: string;
-    aiPolishedBody?: string;
-    companyName?: string;
-  };
-  retirementForm?: {
-    name?: string;
-    address?: string;
-    department?: string;
-    companyName?: string;
-    companyAddress?: string;
-    representativeName?: string;
-    retirementDate?: string;
   };
   createdAt?: string;
 };
@@ -222,6 +207,8 @@ const WEB_MAIL_CONFIG = {
     headerBanner: "/images/taishoku-baasama/taishoku-tool-header-banner.png",
   },
 } as const;
+
+const EPISODE_POST_DISCOUNT = 500;
 
 const emptyForm: WebMailForm = {
   department: "",
@@ -430,11 +417,15 @@ function resolvePricingFromHandoffs(
     const finalPrice =
       typeof episodeHandoff.discount.finalPrice === "number"
         ? episodeHandoff.discount.finalPrice
+        : episodeHandoff.discount.episodeDiscountApplied
+        ? Math.max(0, basePrice - EPISODE_POST_DISCOUNT)
         : basePrice;
 
     const discountAmount =
       typeof episodeHandoff.discount.totalDiscount === "number"
         ? episodeHandoff.discount.totalDiscount
+        : episodeHandoff.discount.episodeDiscountApplied
+        ? EPISODE_POST_DISCOUNT
         : Math.max(0, basePrice - finalPrice);
 
     return {
@@ -533,22 +524,8 @@ export default function WebMailPage() {
         }
       }
 
-      if (episodeHandoff) {
-        nextCompanyName =
-          episodeHandoff.retirementForm?.companyName ||
-          episodeHandoff.episode?.companyName ||
-          nextCompanyName;
-
-        nextCompanyAddress =
-          episodeHandoff.retirementForm?.companyAddress || nextCompanyAddress;
-
-        nextSenderName = episodeHandoff.retirementForm?.name || nextSenderName;
-
-        if (!nextForm.senderAddress1) {
-          nextForm.senderAddress1 =
-            episodeHandoff.retirementForm?.address || "";
-        }
-      }
+      // episodeHandoff は割引情報のみ使用する。
+      // 会社名・差出人情報は退職届由来の retirementHandoff / 保存済み web-mail から復元する。
 
       const resolvedPricing = resolvePricingFromHandoffs(
         episodeHandoff,

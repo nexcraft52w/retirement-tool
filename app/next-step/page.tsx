@@ -51,26 +51,25 @@ export default function RetirementChecklistPage() {
           </div>
         </section>
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-          <Section
-            title="1．退職意思・手続き"
-            guide="まずは退職の意思を、どの形で伝えるかを決めましょう。話せない場合は、書面郵送も選択肢です。"
-            image="taishoku-baasama-half-point.png"
-          >
-            <ul className="list-disc space-y-1 pl-5">
-              <li>意思表示（口頭または書面）</li>
-              <li>伝える相手は、上司・上役・総務など</li>
-              <li>退職日は応相談（会社は引き止めがち／本人は早く辞めたい）</li>
-              <li>直接話せない場合は、退職届を郵送する方法もある</li>
-            </ul>
-          </Section>
+        <Section
+          title="1．退職意思・手続き"
+          guide="まずは退職の意思を、どの形で伝えるかを決めましょう。話せない場合は、書面郵送も選択肢です。"
+          image="taishoku-baasama-half-point.png"
+        >
+          <ul className="list-disc space-y-1 pl-5">
+            <li>意思表示（口頭または書面）</li>
+            <li>伝える相手は、上司・上役・総務など</li>
+            <li>退職日は応相談（会社は引き止めがち／本人は早く辞めたい）</li>
+            <li>直接話せない場合は、退職届を郵送する方法もある</li>
+          </ul>
+        </Section>
 
-          <Section
-            title="退職代行について"
-            guide="費用を払う前に、自分で進められる範囲かどうかを確認しましょう。"
-            image="taishoku-baasama-half-think.png"
-          >
-            <div className="space-y-3 leading-7">
+        <Section
+          title="2．退職代行について"
+          guide="費用を払う前に、自分で進められる範囲かどうかを確認しましょう。"
+          image="taishoku-baasama-half-think.png"
+        >
+          <div className="space-y-3 leading-7">
               <p>
                 退職代行を検討している方は、まず手数料を確認してください。
                 その費用は本当に必要ですか？ あなたの時給で何時間分でしょうか。
@@ -90,21 +89,20 @@ export default function RetirementChecklistPage() {
               <p className="text-sm text-slate-500">
                 ※退職届とあわせて必要事項も送れば、会社とのやり取りを減らせます。
               </p>
-            </div>
+          </div>
 
-            <div className="pt-2">
-              <Link
-                href="/"
-                className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-700"
-              >
-                退職届を作成する
-              </Link>
-            </div>
-          </Section>
-        </div>
+          <div className="pt-2">
+            <Link
+              href="/"
+              className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-slate-700"
+            >
+              退職届を作成する
+            </Link>
+          </div>
+        </Section>
 
         <Section
-          title="2．返却・受取"
+          title="3．返却・受取"
           guide="借りた物はまとめて返却。会社から受け取る書類も忘れず確認しましょう。"
           image="taishoku-baasama-half-gassho.png"
         >
@@ -156,7 +154,7 @@ export default function RetirementChecklistPage() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Section
-            title="3．住所"
+            title="4．住所"
             guide="退職後に書類が届くことがあります。引っ越し予定がある場合は先に備えましょう。"
             image="taishoku-baasama-half-guide.png"
           >
@@ -168,7 +166,7 @@ export default function RetirementChecklistPage() {
           </Section>
 
           <Section
-            title="4．住民税"
+            title="5．住民税"
             guide="退職後に見落としやすいのが住民税です。最後の給与と納付書を確認しましょう。"
             image="taishoku-baasama-half-think.png"
           >
@@ -196,7 +194,7 @@ export default function RetirementChecklistPage() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           <Section
-            title="5．退職後①（役所）"
+            title="6．退職後①（役所）"
             guide="退職後は、健康保険と年金の切替が必要になることがあります。"
             image="taishoku-baasama-half-point.png"
           >
@@ -219,7 +217,7 @@ export default function RetirementChecklistPage() {
           </Section>
 
           <Section
-            title="6．退職後②（収入）"
+            title="7．退職後②（収入）"
             guide="離職票が届いたら、ハローワークで受給条件と金額を確認しましょう。"
             image="taishoku-baasama-half-present.png"
           >
